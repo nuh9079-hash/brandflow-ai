@@ -8,10 +8,12 @@ const navItems = [
   { href: "/history", label: "History" },
   { href: "/favorites", label: "Favorites" },
   { href: "/publish", label: "Paylaşım Merkezi" },
+  { href: "/calendar", label: "Calendar" },
   { href: "/profiles", label: "Profiller" },
   { href: "/media", label: "Medya Merkezi" },
   { href: "/image-studio", label: "AI Image Studio" },
   { href: "/video-studio", label: "AI Video Studio" },
+  { href: "/marketing-advisor", label: "AI Marketing Advisor" },
   { href: "/settings", label: "Settings" },
   { href: "/billing", label: "Billing" },
 ];

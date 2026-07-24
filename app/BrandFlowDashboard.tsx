@@ -4,6 +4,8 @@ import { SignOutButton, UserButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { UpcomingScheduledPosts } from "@/components/calendar/UpcomingScheduledPosts";
+import { LatestRecommendations } from "@/components/marketing/LatestRecommendations";
 import { ProfileBadge } from "@/components/profiles/ProfileBadge";
 import { ProfileOnboarding } from "@/components/profiles/ProfileOnboarding";
 import { Button, Card, Input, Select } from "@/components/ui";
@@ -761,6 +763,11 @@ export default function BrandFlowDashboard() {
               <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Profil türü</p>
               <p className="mt-2 truncate text-lg font-black text-white">{activeProfile ? profileTypeLabels[activeProfile.profile_type] : "Seçilmedi"}</p>
             </Card>
+          </div>
+
+          <div className="mb-5 grid gap-3 lg:grid-cols-2">
+            <UpcomingScheduledPosts />
+            <LatestRecommendations />
           </div>
 
           <Card className="p-4 sm:p-6">

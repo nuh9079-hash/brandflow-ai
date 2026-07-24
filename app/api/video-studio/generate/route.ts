@@ -1,16 +1,23 @@
-import { auth } from "@clerk/nextjs/server";
+﻿import { auth } from "@clerk/nextjs/server";
 import Groq from "groq-sdk";
 import { createMedia, deleteMedia, getMedia, updateMediaStorage } from "@/lib/media/server";
 import { createSignedMediaUrl, createUploadPath } from "@/lib/media/storage";
-import { mediaBucketName, type MediaAsset } from "@/lib/media/types";
+import { mediaBucketName } from "@/lib/media/types";
 import { mediaLimitForType } from "@/lib/media/validation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  aspectRatios,
+  getVideoProvider,
+  pollVideoJob,
+  submitVideoJob,
+  videoStyles,
+  type VideoAspectRatio,
+  type VideoSource,
+  type VideoStatus,
+  type VideoStyle,
+} from "@/lib/video/provider";
 
 export const runtime = "nodejs";
-
-type VideoStatus = "preparing" | "submitting" | "processing" | "completed" | "failed";
-type VideoStyle = "Cinematic" | "Funny" | "Product Promotion" | "Social Media" | "Realistic";
-type VideoAspectRatio = "9:16" | "1:1" | "16:9";
 
 type VideoStudioBody = {
   prompt?: unknown;
@@ -20,34 +27,9 @@ type VideoStudioBody = {
   style?: unknown;
 };
 
-type VideoSource = {
-  media: MediaAsset;
-  signedUrl: string;
-};
-
-type SubmittedVideoJob = {
-  jobId: string;
-  status: VideoStatus;
-};
-
-type PolledVideoJob = {
-  jobId: string;
-  status: VideoStatus;
-  outputUrl?: string;
-  error?: string;
-};
-
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
-
-const videoStyles = new Set<VideoStyle>(["Cinematic", "Funny", "Product Promotion", "Social Media", "Realistic"]);
-const aspectRatios: Record<VideoAspectRatio, { providerRatio: string; width: number; height: number }> = {
-  "9:16": { providerRatio: "720:1280", width: 720, height: 1280 },
-  "1:1": { providerRatio: "960:960", width: 960, height: 960 },
-  "16:9": { providerRatio: "1280:720", width: 1280, height: 720 },
-};
-const defaultRunwayDurations = [5, 10] as const;
 
 function videoError(message: string, status = 400) {
   return Response.json({ error: message }, { status });
@@ -75,46 +57,10 @@ function parseSourceMediaId(value: unknown) {
   return text || null;
 }
 
-function getRunwayDurations() {
-  const configured = process.env.RUNWAY_VIDEO_DURATIONS;
-  if (!configured) return [...defaultRunwayDurations];
-
-  const durations = configured
-    .split(",")
-    .map((value) => Number(value.trim()))
-    .filter((value) => value === 5 || value === 10 || value === 15);
-
-  return Array.from(new Set(durations)).sort((first, second) => first - second);
-}
-
-function getVideoProvider() {
-  const apiKey = process.env.RUNWAY_API_KEY;
-  const supportedDurations = getRunwayDurations();
-
-  return {
-    id: "runway",
-    name: "Runway",
-    configured: Boolean(apiKey),
-    apiKey,
-    baseUrl: process.env.RUNWAY_API_BASE_URL || "https://api.dev.runwayml.com/v1",
-    apiVersion: process.env.RUNWAY_API_VERSION || "2024-11-06",
-    model: process.env.RUNWAY_VIDEO_MODEL || "gen4_turbo",
-    supportedDurations,
-  };
-}
-
-function providerHeaders(provider: ReturnType<typeof getVideoProvider>) {
-  return {
-    Authorization: `Bearer ${provider.apiKey}`,
-    "Content-Type": "application/json",
-    "X-Runway-Version": provider.apiVersion,
-  };
-}
-
 function filenameFromPrompt(prompt: string) {
   const slug = prompt
     .toLocaleLowerCase("tr-TR")
-    .replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ\s-]/gi, "")
+    .replace(/[^a-z0-9ÄŸÃ¼ÅŸÃ¶Ã§Ä±Ä°ÄÃœÅÃ–Ã‡\s-]/gi, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
@@ -158,20 +104,20 @@ async function getSourceMedia(userId: string, mediaId: string | null): Promise<V
 
   const media = await getMedia(userId, mediaId);
   if (!media.ok) {
-    throw new Error("Seçilen medya bulunamadı.");
+    throw new Error("SeÃ§ilen medya bulunamadÄ±.");
   }
 
   if (media.data.type !== "image" && media.data.type !== "video") {
-    throw new Error("Video için yalnızca görsel veya video kaynak seçebilirsin.");
+    throw new Error("Video iÃ§in yalnÄ±zca gÃ¶rsel veya video kaynak seÃ§ebilirsin.");
   }
 
   if (!media.data.storagePath) {
-    throw new Error("Seçilen medyanın dosya bağlantısı hazır değil.");
+    throw new Error("SeÃ§ilen medyanÄ±n dosya baÄŸlantÄ±sÄ± hazÄ±r deÄŸil.");
   }
 
   const signed = await createSignedMediaUrl(userId, media.data.storagePath);
   if (!signed.ok) {
-    throw new Error("Seçilen medya için güvenli bağlantı oluşturulamadı.");
+    throw new Error("SeÃ§ilen medya iÃ§in gÃ¼venli baÄŸlantÄ± oluÅŸturulamadÄ±.");
   }
 
   return {
@@ -180,120 +126,24 @@ async function getSourceMedia(userId: string, mediaId: string | null): Promise<V
   };
 }
 
-async function submitRunwayJob(input: {
-  prompt: string;
-  aspectRatio: VideoAspectRatio;
-  duration: number;
-  source: VideoSource | null;
-}): Promise<SubmittedVideoJob> {
-  const provider = getVideoProvider();
-  if (!provider.configured || !provider.apiKey) {
-    throw new Error("Video üretimi için gerçek sağlayıcı bağlı değil. RUNWAY_API_KEY ortam değişkenini eklemelisin.");
-  }
-
-  const ratio = aspectRatios[input.aspectRatio];
-  const endpoint = input.source
-    ? input.source.media.type === "video"
-      ? "video_to_video"
-      : "image_to_video"
-    : "text_to_video";
-  const sourcePayload =
-    input.source?.media.type === "video"
-      ? { promptVideo: input.source.signedUrl }
-      : input.source?.media.type === "image"
-        ? { promptImage: input.source.signedUrl }
-        : {};
-
-  const response = await fetch(`${provider.baseUrl}/${endpoint}`, {
-    method: "POST",
-    headers: providerHeaders(provider),
-    body: JSON.stringify({
-      model: provider.model,
-      promptText: input.prompt,
-      ratio: ratio.providerRatio,
-      duration: input.duration,
-      ...sourcePayload,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Video sağlayıcısı isteği kabul etmedi. API anahtarı, model ve hesap limitlerini kontrol et.");
-  }
-
-  const json = (await response.json()) as { id?: string; taskId?: string; status?: string };
-  const jobId = json.id || json.taskId;
-
-  if (!jobId) {
-    throw new Error("Video sağlayıcısı job ID döndürmedi.");
-  }
-
-  return {
-    jobId,
-    status: normalizeProviderStatus(json.status),
-  };
-}
-
-function normalizeProviderStatus(status: unknown): VideoStatus {
-  const value = typeof status === "string" ? status.toLowerCase() : "";
-
-  if (["succeeded", "success", "completed", "complete"].includes(value)) return "completed";
-  if (["failed", "failure", "cancelled", "canceled"].includes(value)) return "failed";
-  if (["pending", "queued", "submitted", "starting"].includes(value)) return "submitting";
-  return "processing";
-}
-
-async function pollRunwayJob(jobId: string): Promise<PolledVideoJob> {
-  const provider = getVideoProvider();
-  if (!provider.configured || !provider.apiKey) {
-    throw new Error("Video üretimi için gerçek sağlayıcı bağlı değil. RUNWAY_API_KEY ortam değişkenini eklemelisin.");
-  }
-
-  const response = await fetch(`${provider.baseUrl}/tasks/${encodeURIComponent(jobId)}`, {
-    method: "GET",
-    headers: providerHeaders(provider),
-  });
-
-  if (!response.ok) {
-    throw new Error("Video durumu alınamadı. Sağlayıcı ayarlarını kontrol et.");
-  }
-
-  const json = (await response.json()) as {
-    id?: string;
-    status?: string;
-    output?: string | string[] | Array<{ url?: string }>;
-    error?: string;
-    failure?: string;
-  };
-  const status = normalizeProviderStatus(json.status);
-  const rawOutput = Array.isArray(json.output) ? json.output[0] : json.output;
-  const outputUrl = typeof rawOutput === "string" ? rawOutput : rawOutput?.url;
-
-  return {
-    jobId: json.id || jobId,
-    status,
-    outputUrl,
-    error: json.error || json.failure,
-  };
-}
-
 async function downloadVideo(videoUrl: string) {
   const response = await fetch(videoUrl);
 
   if (!response.ok) {
-    throw new Error("Video dosyası indirilemedi.");
+    throw new Error("Video dosyasÄ± indirilemedi.");
   }
 
   const contentLength = Number(response.headers.get("content-length") || 0);
   const videoLimit = mediaLimitForType("video");
 
   if (contentLength > videoLimit) {
-    throw new Error("Üretilen video Medya Merkezi sınırını aşıyor.");
+    throw new Error("Ãœretilen video Medya Merkezi sÄ±nÄ±rÄ±nÄ± aÅŸÄ±yor.");
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
 
   if (buffer.byteLength > videoLimit) {
-    throw new Error("Üretilen video Medya Merkezi sınırını aşıyor.");
+    throw new Error("Ãœretilen video Medya Merkezi sÄ±nÄ±rÄ±nÄ± aÅŸÄ±yor.");
   }
 
   return {
@@ -311,7 +161,7 @@ async function saveGeneratedVideo(userId: string, input: {
   const supabase = getSupabaseServerClient();
 
   if (!supabase) {
-    throw new Error("Medya depolama yapılandırılmadı.");
+    throw new Error("Medya depolama yapÄ±landÄ±rÄ±lmadÄ±.");
   }
 
   const ratio = aspectRatios[input.aspectRatio];
@@ -331,7 +181,7 @@ async function saveGeneratedVideo(userId: string, input: {
     });
 
     if (!created.ok) {
-      throw new Error("Video medya kaydı oluşturulamadı.");
+      throw new Error("Video medya kaydÄ± oluÅŸturulamadÄ±.");
     }
 
     mediaId = created.data.id;
@@ -349,13 +199,13 @@ async function saveGeneratedVideo(userId: string, input: {
 
     if (!stored.ok) {
       await supabase.storage.from(mediaBucketName).remove([storagePath]);
-      throw new Error("Video Medya Merkezi kaydı tamamlanamadı.");
+      throw new Error("Video Medya Merkezi kaydÄ± tamamlanamadÄ±.");
     }
 
     const signed = await createSignedMediaUrl(userId, storagePath);
 
     if (!signed.ok) {
-      throw new Error("Video önizleme bağlantısı oluşturulamadı.");
+      throw new Error("Video Ã¶nizleme baÄŸlantÄ±sÄ± oluÅŸturulamadÄ±.");
     }
 
     return {
@@ -375,7 +225,7 @@ export async function GET(req: Request) {
   const { userId } = await auth();
 
   if (!userId) {
-    return videoError("Video Studio için giriş yapmalısın.", 401);
+    return videoError("Video Studio iÃ§in giriÅŸ yapmalÄ±sÄ±n.", 401);
   }
 
   const provider = getVideoProvider();
@@ -392,7 +242,7 @@ export async function GET(req: Request) {
         styles: Array.from(videoStyles),
         message: provider.configured
           ? ""
-          : "Video üretimi için RUNWAY_API_KEY ortam değişkeni eksik. Anahtar eklenmeden gerçek video üretilemez.",
+          : "Video Ã¼retimi iÃ§in RUNWAY_API_KEY ortam deÄŸiÅŸkeni eksik. Anahtar eklenmeden gerÃ§ek video Ã¼retilemez.",
       },
     });
   }
@@ -402,14 +252,14 @@ export async function GET(req: Request) {
   const duration = safeInteger(url.searchParams.get("duration")) || provider.supportedDurations[0] || 5;
 
   try {
-    const job = await pollRunwayJob(jobId);
+    const job = await pollVideoJob(jobId);
 
     if (job.status === "failed") {
       return Response.json({
         data: {
           status: "failed" satisfies VideoStatus,
           jobId,
-          error: job.error || "Video üretimi başarısız oldu.",
+          error: job.error || "Video Ã¼retimi baÅŸarÄ±sÄ±z oldu.",
         },
       });
     }
@@ -424,7 +274,7 @@ export async function GET(req: Request) {
     }
 
     if (!job.outputUrl) {
-      return videoError("Video tamamlandı ama sağlayıcı video bağlantısı döndürmedi.", 502);
+      return videoError("Video tamamlandÄ± ama saÄŸlayÄ±cÄ± video baÄŸlantÄ±sÄ± dÃ¶ndÃ¼rmedi.", 502);
     }
 
     const saved = await saveGeneratedVideo(userId, {
@@ -444,7 +294,7 @@ export async function GET(req: Request) {
       },
     });
   } catch (error) {
-    return videoError(error instanceof Error ? error.message : "Video durumu alınamadı.", 500);
+    return videoError(error instanceof Error ? error.message : "Video durumu alÄ±namadÄ±.", 500);
   }
 }
 
@@ -452,14 +302,14 @@ export async function POST(req: Request) {
   const { userId } = await auth();
 
   if (!userId) {
-    return videoError("Video üretmek için giriş yapmalısın.", 401);
+    return videoError("Video Ã¼retmek iÃ§in giriÅŸ yapmalÄ±sÄ±n.", 401);
   }
 
   const provider = getVideoProvider();
 
   if (!provider.configured) {
     return videoError(
-      "Video üretimi için gerçek sağlayıcı bağlı değil. RUNWAY_API_KEY ortam değişkeni eksik olduğu için video üretimi başlatılamaz.",
+      "Video Ã¼retimi iÃ§in gerÃ§ek saÄŸlayÄ±cÄ± baÄŸlÄ± deÄŸil. RUNWAY_API_KEY ortam deÄŸiÅŸkeni eksik olduÄŸu iÃ§in video Ã¼retimi baÅŸlatÄ±lamaz.",
       503,
     );
   }
@@ -471,17 +321,17 @@ export async function POST(req: Request) {
   const style = parseStyle(body.style);
 
   if (!prompt) {
-    return videoError("Video fikrini yazmalısın.", 400);
+    return videoError("Video fikrini yazmalÄ±sÄ±n.", 400);
   }
 
   if (!provider.supportedDurations.some((supportedDuration) => supportedDuration === duration)) {
-    return videoError("Seçilen süre bu video sağlayıcısı tarafından desteklenmiyor.", 400);
+    return videoError("SeÃ§ilen sÃ¼re bu video saÄŸlayÄ±cÄ±sÄ± tarafÄ±ndan desteklenmiyor.", 400);
   }
 
   try {
     const source = await getSourceMedia(userId, parseSourceMediaId(body.sourceMediaId));
     const enhancedPrompt = await buildVideoPrompt(prompt, style, aspectRatio, duration, source);
-    const job = await submitRunwayJob({
+    const job = await submitVideoJob({
       prompt: enhancedPrompt,
       aspectRatio,
       duration,
@@ -497,6 +347,7 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    return videoError(error instanceof Error ? error.message : "Video üretimi başlatılamadı.", 500);
+    return videoError(error instanceof Error ? error.message : "Video Ã¼retimi baÅŸlatÄ±lamadÄ±.", 500);
   }
 }
+
