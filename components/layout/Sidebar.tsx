@@ -14,6 +14,7 @@ const navItems = [
   { href: "/image-studio", label: "AI Image Studio" },
   { href: "/video-studio", label: "AI Video Studio" },
   { href: "/marketing-advisor", label: "AI Marketing Advisor" },
+  { href: "/analytics", label: "Analytics" },
   { href: "/settings", label: "Settings" },
   { href: "/billing", label: "Billing" },
 ];

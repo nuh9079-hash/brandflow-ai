@@ -6,6 +6,7 @@ import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { UpcomingScheduledPosts } from "@/components/calendar/UpcomingScheduledPosts";
 import { LatestRecommendations } from "@/components/marketing/LatestRecommendations";
+import { AnalyticsSummary } from "@/components/analytics/AnalyticsSummary";
 import { ProfileBadge } from "@/components/profiles/ProfileBadge";
 import { ProfileOnboarding } from "@/components/profiles/ProfileOnboarding";
 import { Button, Card, Input, Select } from "@/components/ui";
@@ -765,6 +766,7 @@ export default function BrandFlowDashboard() {
             </Card>
           </div>
 
+          <AnalyticsSummary />
           <div className="mb-5 grid gap-3 lg:grid-cols-2">
             <UpcomingScheduledPosts />
             <LatestRecommendations />
