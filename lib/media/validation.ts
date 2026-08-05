@@ -93,7 +93,12 @@ export function validateUpdateMediaInput(value: unknown) {
     input.profileId = nullableString(raw.profileId, 80);
   }
 
-  if (!("name" in input) && !("type" in input) && !("profileId" in input)) {
+  if ("isFavorite" in raw) {
+    if (typeof raw.isFavorite !== "boolean") return { ok: false as const, error: "Favori değeri geçersiz." };
+    input.isFavorite = raw.isFavorite;
+  }
+
+  if (!("name" in input) && !("type" in input) && !("profileId" in input) && !("isFavorite" in input)) {
     return { ok: false as const, error: "Güncellenecek alan bulunamadı." };
   }
 

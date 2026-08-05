@@ -13,7 +13,7 @@ export default async function MarketingAdvisorPage() {
         <section className="flex-1 px-5 py-6 sm:px-8 lg:px-10 lg:py-8">
           <Navbar title="AI Marketing Advisor">
             <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-              Görsel, video, caption ve marka profilini birlikte analiz et; platforma göre daha iyi metin, CTA, hashtag ve yayın önerileri al.
+              İşletme briefini ve gerçek BrandFlow iç verilerini kullanarak uygulanabilir pazarlama stratejisi oluştur.
             </p>
           </Navbar>
           <div className="pt-6">

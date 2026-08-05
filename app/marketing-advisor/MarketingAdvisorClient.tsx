@@ -1,357 +1,76 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { Button, Card, EmptyState } from "@/components/ui";
-import type { AdvisorCategory, AdvisorPlatform, MarketingAdvisorAnalysis, MarketingAdvisorReport } from "@/lib/marketing/advisor";
-import type { MediaAsset } from "@/lib/media/types";
-import type { UserProfile } from "@/lib/profiles/types";
+import { useCallback, useEffect, useState } from "react";
+import { BarChart3, Check, Clock3, History, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { Button, Card, EmptyState, Input } from "@/components/ui";
+import type { MarketingStrategy, StrategyReport } from "@/lib/marketing/strategy";
+import { socialPlatforms, type SocialPlatform } from "@/lib/social/connections";
 
-type MediaResponse = {
-  data?: MediaAsset[];
-  error?: string;
-};
+type ApiResponse<T> = { data?: T; error?: string };
+const labels: Record<SocialPlatform, string> = { instagram: "Instagram", facebook: "Facebook", linkedin: "LinkedIn", x: "X", youtube: "YouTube", tiktok: "TikTok" };
+const emptyForm = { businessName: "", industry: "", targetAudience: "", goals: "", website: "", platforms: [] as SocialPlatform[] };
 
-type ProfilesResponse = {
-  profiles?: UserProfile[];
-  error?: string;
-};
-
-type AdvisorResponse = {
-  data?: MarketingAdvisorReport | MarketingAdvisorReport[];
-  error?: string;
-};
-
-const platforms: Array<{ value: AdvisorPlatform; label: string; helper: string }> = [
-  { value: "instagram", label: "Instagram", helper: "Reels, post ve story dili" },
-  { value: "facebook", label: "Facebook", helper: "Topluluk ve reklam uyumu" },
-  { value: "tiktok", label: "TikTok", helper: "Hook ve hızlı izlenme potansiyeli" },
-  { value: "twitter", label: "X", helper: "Kısa metin ve tartışma etkisi" },
-  { value: "linkedin", label: "LinkedIn", helper: "Profesyonel güven ve netlik" },
-];
-
-const categoryLabels: Record<AdvisorCategory, string> = {
-  visualQuality: "Visual Quality",
-  brandConsistency: "Brand Consistency",
-  audienceMatch: "Audience Match",
-  engagementPrediction: "Engagement Prediction",
-  ctaStrength: "CTA Strength",
-  captionQuality: "Caption Quality",
-  hashtagQuality: "Hashtag Quality",
-  platformOptimization: "Platform Optimization",
-  accessibility: "Accessibility",
-  readingDifficulty: "Reading Difficulty",
-  colorHarmony: "Color Harmony",
-  composition: "Composition",
-  textReadability: "Text Readability",
-};
-
-const categoryOrder = Object.keys(categoryLabels) as AdvisorCategory[];
-
-function scoreColor(score: number) {
-  if (score >= 80) return "text-emerald-200";
-  if (score >= 60) return "text-amber-200";
-  return "text-red-200";
+function ListSection({ title, items }: { title: string; items: string[] }) {
+  return <Card className="p-5"><h3 className="font-semibold text-white">{title}</h3><ul className="mt-4 space-y-3">{items.map((item, index) => <li key={`${title}-${index}`} className="flex gap-3 text-sm leading-6 text-zinc-300"><Check className="mt-1 h-4 w-4 shrink-0 text-emerald-400" /><span>{item}</span></li>)}</ul></Card>;
 }
 
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
-function isReportArray(value: AdvisorResponse["data"]): value is MarketingAdvisorReport[] {
-  return Array.isArray(value);
+function ReportView({ report }: { report: MarketingStrategy }) {
+  return <div className="space-y-5">
+    <div className="grid gap-4 lg:grid-cols-[180px_1fr]">
+      <Card className="flex min-h-40 flex-col items-center justify-center p-5 text-center"><BarChart3 className="mb-3 h-6 w-6 text-violet-400" /><strong className="text-4xl text-white">{report.marketingScore}</strong><span className="mt-1 text-xs uppercase text-zinc-500">Pazarlama puanı</span></Card>
+      <Card className="p-5"><h3 className="font-semibold text-white">Yönetici Özeti</h3><p className="mt-4 text-sm leading-7 text-zinc-300">{report.executiveSummary}</p></Card>
+    </div>
+    <div className="grid gap-4 xl:grid-cols-2"><ListSection title="Büyüme Fırsatları" items={report.growthOpportunities} /><ListSection title="Geliştirilmesi Gerekenler" items={report.weaknesses} /><ListSection title="İçerik Stratejisi" items={report.contentStrategy} /><ListSection title="SEO Önerileri" items={report.seoSuggestions} /><ListSection title="Reklam Fikirleri" items={report.advertisingIdeas} /><ListSection title="CTA Önerileri" items={report.ctaRecommendations} /></div>
+    <Card className="p-5"><h3 className="font-semibold text-white">Marka Konumlandırması</h3><p className="mt-4 text-sm leading-7 text-zinc-300">{report.brandPositioning}</p></Card>
+    <Card className="overflow-hidden p-0"><div className="border-b border-white/10 px-5 py-4"><h3 className="font-semibold text-white">Haftalık İçerik Planı</h3></div><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-white/[0.03] text-xs uppercase text-zinc-500"><tr><th className="p-4">Gün</th><th className="p-4">Konu</th><th className="p-4">Format</th><th className="p-4">Platform</th><th className="p-4">CTA</th></tr></thead><tbody className="divide-y divide-white/10">{report.weeklyContentPlan.map((item, index) => <tr key={`${item.day}-${index}`} className="text-zinc-300"><td className="p-4 font-medium text-white">{item.day}</td><td className="p-4">{item.topic}</td><td className="p-4">{item.format}</td><td className="p-4">{item.platform}</td><td className="p-4">{item.cta}</td></tr>)}</tbody></table></div></Card>
+  </div>;
 }
 
 export function MarketingAdvisorClient() {
-  const [mediaItems, setMediaItems] = useState<MediaAsset[]>([]);
-  const [profiles, setProfiles] = useState<UserProfile[]>([]);
-  const [latestReports, setLatestReports] = useState<MarketingAdvisorReport[]>([]);
-  const [mediaAssetId, setMediaAssetId] = useState("");
-  const [profileId, setProfileId] = useState("");
-  const [platform, setPlatform] = useState<AdvisorPlatform>("instagram");
-  const [caption, setCaption] = useState("");
-  const [result, setResult] = useState<MarketingAdvisorReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [analyzing, setAnalyzing] = useState(false);
+  const [tab, setTab] = useState<"advisor" | "history">("advisor");
+  const [form, setForm] = useState(emptyForm);
+  const [report, setReport] = useState<StrategyReport | null>(null);
+  const [history, setHistory] = useState<StrategyReport[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function loadData() {
-    setLoading(true);
-    setError("");
-
-    try {
-      const [mediaResponse, profilesResponse, latestResponse] = await Promise.all([
-        fetch("/api/media?sort=newest"),
-        fetch("/api/profiles"),
-        fetch("/api/marketing-advisor/analyze?limit=5"),
-      ]);
-      const mediaJson = (await mediaResponse.json()) as MediaResponse;
-      const profilesJson = (await profilesResponse.json()) as ProfilesResponse;
-      const latestJson = (await latestResponse.json()) as AdvisorResponse;
-
-      if (mediaResponse.ok && mediaJson.data) {
-        setMediaItems(mediaJson.data.filter((item) => (item.type === "image" || item.type === "video") && item.storagePath));
-      }
-
-      if (profilesResponse.ok && profilesJson.profiles) {
-        const loadedProfiles = profilesJson.profiles;
-        setProfiles(loadedProfiles);
-        setProfileId((current) => current || loadedProfiles.find((profile) => profile.is_default)?.id || loadedProfiles[0]?.id || "");
-      }
-
-      if (latestResponse.ok && isReportArray(latestJson.data)) {
-        setLatestReports(latestJson.data);
-      }
-    } catch {
-      setError("Marketing Advisor bilgileri yüklenemedi.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadData();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true); setError("");
+    try { const response = await fetch("/api/marketing-advisor/history", { cache: "no-store" }); const json = await response.json() as ApiResponse<StrategyReport[]>; if (!response.ok) throw new Error(json.error || "Rapor geçmişi alınamadı."); setHistory(json.data || []); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Rapor geçmişi alınamadı."); }
+    finally { setHistoryLoading(false); }
   }, []);
 
-  const selectedMedia = useMemo(() => mediaItems.find((item) => item.id === mediaAssetId) || null, [mediaItems, mediaAssetId]);
-  const selectedProfile = useMemo(() => profiles.find((profile) => profile.id === profileId) || null, [profiles, profileId]);
-  const analysis: MarketingAdvisorAnalysis | null = result?.analysis || null;
+  useEffect(() => {
+    if (tab !== "history") return;
+    const timer = window.setTimeout(() => void loadHistory(), 0);
+    return () => window.clearTimeout(timer);
+  }, [tab, loadHistory]);
 
-  async function analyze() {
-    if (!mediaAssetId) {
-      setError("Analiz için Medya Merkezinden bir görsel veya video seç.");
-      return;
-    }
-
-    setAnalyzing(true);
-    setError("");
-    setResult(null);
-
-    try {
-      const response = await fetch("/api/marketing-advisor/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mediaAssetId,
-          profileId: profileId || null,
-          platform,
-          caption,
-        }),
-      });
-      const json = (await response.json()) as AdvisorResponse;
-
-      if (!response.ok || !json.data || isReportArray(json.data)) {
-        throw new Error(json.error || "Analiz oluşturulamadı.");
-      }
-
-      setResult(json.data);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Analiz oluşturulamadı.");
-    } finally {
-      setAnalyzing(false);
-    }
+  function togglePlatform(platform: SocialPlatform) { setForm((current) => ({ ...current, platforms: current.platforms.includes(platform) ? current.platforms.filter((item) => item !== platform) : [...current.platforms, platform] })); }
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setError(""); if (!form.platforms.length) { setError("En az bir sosyal platform seçmelisin."); return; } setLoading(true);
+    try { const response = await fetch("/api/marketing-advisor/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); const json = await response.json() as ApiResponse<StrategyReport>; if (!response.ok || !json.data) throw new Error(json.error || "Pazarlama analizi oluşturulamadı."); setReport(json.data); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Pazarlama analizi oluşturulamadı."); }
+    finally { setLoading(false); }
   }
+  function reopen(item: StrategyReport) { setForm({ businessName: item.businessName, industry: item.industry, targetAudience: item.targetAudience, goals: item.goals, website: item.website, platforms: item.platforms }); setReport(item); setError(""); setTab("advisor"); }
+  async function remove(id: string) { setError(""); try { const response = await fetch(`/api/marketing-advisor/history?id=${encodeURIComponent(id)}`, { method: "DELETE" }); const json = await response.json() as ApiResponse<{ id: string }>; if (!response.ok) throw new Error(json.error || "Rapor silinemedi."); setHistory((current) => current.filter((item) => item.id !== id)); if (report?.id === id) setReport(null); } catch (cause) { setError(cause instanceof Error ? cause.message : "Rapor silinemedi."); } }
 
-  function applyLatest(report: MarketingAdvisorReport) {
-    setResult(report);
-    setMediaAssetId(report.mediaAssetId);
-    setProfileId(report.profileId || "");
-    setPlatform(report.platform);
-    setCaption(report.caption);
-  }
-
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(340px,460px)_1fr]">
-      <Card className="p-5">
-        <form
-          className="grid gap-5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void analyze();
-          }}
-        >
-          <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Analiz briefi</p>
-            <h2 className="mt-2 text-xl font-black text-white">İçeriği değerlendir</h2>
-          </div>
-
-          <label className="block text-sm font-semibold text-zinc-200">
-            Medya
-            <select value={mediaAssetId} onChange={(event) => setMediaAssetId(event.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm font-semibold text-zinc-100 outline-none focus:border-emerald-300">
-              <option value="">Medya seç</option>
-              {mediaItems.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.type === "video" ? "Video" : "Görsel"} - {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {selectedMedia && (
-            <div className="rounded-lg border border-white/10 bg-zinc-950/70 p-3 text-sm text-zinc-300">
-              <span className="font-black text-white">{selectedMedia.name}</span>
-              <span className="ml-2 text-zinc-500">{selectedMedia.mimeType}</span>
-            </div>
-          )}
-
-          <label className="block text-sm font-semibold text-zinc-200">
-            Marka profili
-            <select value={profileId} onChange={(event) => setProfileId(event.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm font-semibold text-zinc-100 outline-none focus:border-emerald-300">
-              <option value="">Profil kullanma</option>
-              {profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.profile_name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {selectedProfile && (
-            <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-3 text-sm leading-6 text-emerald-100">
-              {selectedProfile.business_name || selectedProfile.display_name || selectedProfile.creator_name || selectedProfile.profile_name}
-              {selectedProfile.target_audience && <span className="block text-emerald-200/80">Hedef: {selectedProfile.target_audience}</span>}
-            </div>
-          )}
-
-          <div>
-            <p className="text-sm font-semibold text-zinc-200">Platform</p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {platforms.map((item) => (
-                <button key={item.value} type="button" onClick={() => setPlatform(item.value)} className={`rounded-lg border p-3 text-left transition ${platform === item.value ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100" : "border-white/10 bg-white/[0.03] text-zinc-400 hover:text-white"}`}>
-                  <span className="block text-sm font-black">{item.label}</span>
-                  <span className="mt-1 block text-xs">{item.helper}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <label className="block text-sm font-semibold text-zinc-200">
-            Caption
-            <textarea value={caption} onChange={(event) => setCaption(event.target.value)} rows={6} placeholder="Mevcut paylaşım metnini buraya yaz..." className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-zinc-600 focus:border-emerald-300" />
-          </label>
-
-          {error && <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm font-semibold text-red-200">{error}</div>}
-
-          <Button type="submit" disabled={loading || analyzing} className="py-4 text-base font-black">
-            {analyzing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-950/30 border-t-zinc-950" />}
-            {analyzing ? "Analiz ediliyor" : "Analiz Et"}
-          </Button>
-
-          <Link href="/media" className="text-center text-sm font-bold text-zinc-400 transition hover:text-white">
-            Medya Merkezine git
-          </Link>
-        </form>
-      </Card>
-
-      <div className="grid gap-5">
-        {loading ? (
-          <Card className="p-5">
-            <div className="h-36 animate-pulse rounded-lg bg-white/5" />
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              <div className="h-24 animate-pulse rounded-lg bg-white/5" />
-              <div className="h-24 animate-pulse rounded-lg bg-white/5" />
-              <div className="h-24 animate-pulse rounded-lg bg-white/5" />
-            </div>
-          </Card>
-        ) : !analysis ? (
-          <EmptyState title="Henüz analiz yok" description="Medya seç, caption ekle ve hedef platformu belirle. Advisor gerçek medya dosyasına erişmeden analiz üretmez." />
-        ) : (
-          <>
-            <Card className="p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Overall score</p>
-                  <h2 className={`mt-2 text-6xl font-black ${scoreColor(analysis.overallScore)}`}>{analysis.overallScore}</h2>
-                </div>
-                <div className="grid gap-2 text-sm text-zinc-300">
-                  <p><span className="text-zinc-500">Platform:</span> {platforms.find((item) => item.value === result?.platform)?.label}</p>
-                  <p><span className="text-zinc-500">Medya:</span> {selectedMedia?.name || result?.mediaAssetId}</p>
-                  <p><span className="text-zinc-500">Tarih:</span> {result ? formatDate(result.createdAt) : ""}</p>
-                </div>
-              </div>
-            </Card>
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {categoryOrder.map((category) => {
-                const item = analysis.categories[category];
-                return (
-                  <Card key={category} className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="text-sm font-black text-white">{categoryLabels[category]}</h3>
-                      <span className={`text-lg font-black ${scoreColor(item.score)}`}>{item.score}</span>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-zinc-400">{item.explanation}</p>
-                    {item.suggestions.length > 0 && (
-                      <ul className="mt-3 list-disc space-y-1 pl-4 text-sm leading-6 text-zinc-300">
-                        {item.suggestions.map((suggestion) => (
-                          <li key={suggestion}>{suggestion}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </Card>
-                );
-              })}
-            </div>
-
-            <Card className="p-5">
-              <h2 className="text-xl font-black text-white">Daha iyi öneriler</h2>
-              <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                <div className="rounded-lg border border-white/10 bg-zinc-950/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Caption</p>
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-200">{analysis.betterCaption}</p>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-zinc-950/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">CTA</p>
-                  <p className="mt-3 text-sm leading-6 text-zinc-200">{analysis.betterCta}</p>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-zinc-950/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Hashtags</p>
-                  <p className="mt-3 text-sm leading-6 text-emerald-200">{analysis.betterHashtags.join(" ")}</p>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-zinc-950/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Zaman ve oran</p>
-                  <p className="mt-3 text-sm leading-6 text-zinc-200">{analysis.betterPostingTime}</p>
-                  <p className="mt-2 text-sm leading-6 text-zinc-400">{analysis.betterAspectRatioRecommendation}</p>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-zinc-950/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Kitle</p>
-                  <p className="mt-3 text-sm leading-6 text-zinc-200">{analysis.suggestedAudience}</p>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-zinc-950/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Kampanya hedefi</p>
-                  <p className="mt-3 text-sm leading-6 text-zinc-200">{analysis.suggestedCampaignObjective}</p>
-                </div>
-              </div>
-            </Card>
-          </>
-        )}
-
-        <Card className="p-5">
-          <h2 className="text-lg font-black text-white">Son AI önerileri</h2>
-          <div className="mt-4 grid gap-3">
-            {latestReports.length === 0 ? (
-              <p className="text-sm text-zinc-500">Henüz kayıtlı analiz yok.</p>
-            ) : (
-              latestReports.map((report) => (
-                <button key={report.id} type="button" onClick={() => applyLatest(report)} className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-left transition hover:bg-white/5">
-                  <span>
-                    <span className="block text-sm font-black text-white">{platforms.find((item) => item.value === report.platform)?.label} analizi</span>
-                    <span className="mt-1 block text-xs text-zinc-500">{formatDate(report.createdAt)}</span>
-                  </span>
-                  <span className={`text-lg font-black ${scoreColor(report.analysis.overallScore)}`}>{report.analysis.overallScore}</span>
-                </button>
-              ))
-            )}
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
+  return <div className="space-y-6">
+    <div className="inline-flex rounded-md border border-white/10 bg-zinc-950 p-1"><button type="button" onClick={() => setTab("advisor")} className={`flex items-center gap-2 rounded px-4 py-2 text-sm ${tab === "advisor" ? "bg-violet-600 text-white" : "text-zinc-400"}`}><Sparkles className="h-4 w-4" />Danışman</button><button type="button" onClick={() => setTab("history")} className={`flex items-center gap-2 rounded px-4 py-2 text-sm ${tab === "history" ? "bg-violet-600 text-white" : "text-zinc-400"}`}><History className="h-4 w-4" />Geçmiş</button></div>
+    {error ? <div role="alert" className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
+    {tab === "advisor" ? <div className="grid items-start gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
+      <Card className="p-5 xl:sticky xl:top-6"><div className="mb-5"><h2 className="text-lg font-semibold text-white">İşletmeni analiz et</h2><p className="mt-1 text-sm leading-6 text-zinc-400">Verdiğin bilgiler ve gerçek BrandFlow kullanım verilerin üzerinden uygulanabilir bir strateji oluştur.</p></div><form className="space-y-4" onSubmit={submit}>
+        <Input label="İşletme adı" required value={form.businessName} onChange={(e) => setForm({ ...form, businessName: e.target.value })} placeholder="Örn. BrandFlow" />
+        <Input label="Sektör" required value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} placeholder="Örn. E-ticaret" />
+        <label className="block"><span className="mb-2 block text-sm font-medium text-zinc-300">Hedef kitle</span><textarea required rows={3} value={form.targetAudience} onChange={(e) => setForm({ ...form, targetAudience: e.target.value })} className="w-full rounded-md border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-violet-500" /></label>
+        <label className="block"><span className="mb-2 block text-sm font-medium text-zinc-300">Hedefler</span><textarea required rows={3} value={form.goals} onChange={(e) => setForm({ ...form, goals: e.target.value })} className="w-full rounded-md border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-violet-500" /></label>
+        <Input label="Website (isteğe bağlı)" type="url" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} placeholder="https://" />
+        <fieldset><legend className="mb-2 text-sm font-medium text-zinc-300">Mevcut sosyal platformlar</legend><div className="grid grid-cols-2 gap-2">{socialPlatforms.map((platform) => <label key={platform} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${form.platforms.includes(platform) ? "border-violet-500/60 bg-violet-500/10 text-white" : "border-white/10 text-zinc-400"}`}><input type="checkbox" className="accent-violet-500" checked={form.platforms.includes(platform)} onChange={() => togglePlatform(platform)} />{labels[platform]}</label>)}</div></fieldset>
+        <Button type="submit" className="w-full" disabled={loading}>{loading ? <><Loader2 className="h-4 w-4 animate-spin" />Gemini raporu hazırlıyor</> : <><Sparkles className="h-4 w-4" />Pazarlama Analizi Oluştur</>}</Button>
+      </form></Card><div>{report ? <ReportView report={report.report} /> : <EmptyState title="İlk strateji raporunu oluştur" description="Büyüme fırsatları, içerik planı, reklam fikirleri ve pazarlama puanı burada görünecek." />}</div>
+    </div> : historyLoading ? <Card className="flex min-h-64 items-center justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-violet-400" /><span className="ml-3 text-sm text-zinc-400">Raporlar yükleniyor...</span></Card> : history.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{history.map((item) => <Card key={item.id} className="p-5"><div className="flex items-start justify-between gap-4"><div><h3 className="font-semibold text-white">{item.businessName}</h3><p className="mt-1 text-sm text-zinc-500">{item.industry}</p></div><span className="rounded bg-violet-500/10 px-2 py-1 text-sm font-semibold text-violet-300">{item.report.marketingScore}/100</span></div><p className="mt-4 line-clamp-3 text-sm leading-6 text-zinc-400">{item.report.executiveSummary}</p><div className="mt-4 flex items-center gap-2 text-xs text-zinc-500"><Clock3 className="h-3.5 w-3.5" />{new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.createdAt))}</div><div className="mt-5 flex gap-2"><Button className="flex-1" variant="secondary" onClick={() => reopen(item)}>Aç</Button><Button variant="secondary" aria-label="Raporu sil" onClick={() => void remove(item.id)}><Trash2 className="h-4 w-4" /></Button></div></Card>)}</div> : <EmptyState title="Henüz rapor yok" description="Oluşturduğun pazarlama stratejileri burada listelenecek." />}
+  </div>;
 }

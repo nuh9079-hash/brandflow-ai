@@ -52,6 +52,7 @@ function normalizeMedia(row: unknown): MediaAsset | null {
     duration: typeof media.duration === "number" ? media.duration : media.duration ? Number(media.duration) : null,
     storagePath: nullableString(media.storage_path),
     storageUrl: nullableString(media.storage_url),
+    isFavorite: Boolean(media.is_favorite),
     createdAt: String(media.created_at ?? ""),
     updatedAt: String(media.updated_at ?? ""),
   };

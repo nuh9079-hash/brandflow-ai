@@ -1,577 +1,115 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState } from "@/components/ui";
-import type { CalendarPlatform, CalendarStatus, ScheduledPost } from "@/lib/calendar/types";
+import type { ContentCalendarItem, ContentCalendarStatus } from "@/lib/calendar/content-types";
 import type { MediaAsset } from "@/lib/media/types";
+import type { SafeSocialConnection, SocialPlatform } from "@/lib/social/connections";
 
-type CalendarView = "month" | "week" | "day";
+type CalendarView = "month" | "week";
+type CalendarResponse = { data?: ContentCalendarItem[]; error?: string };
+type MediaResponse = { data?: MediaAsset[]; error?: string };
+type ConnectionResponse = { data?: SafeSocialConnection[]; error?: string };
 
-type CalendarResponse = {
-  data?: ScheduledPost[];
-  error?: string;
-};
+const platformNames: Record<SocialPlatform, string> = { instagram: "Instagram", facebook: "Facebook", linkedin: "LinkedIn", x: "X", youtube: "YouTube", tiktok: "TikTok" };
+const statusNames: Record<ContentCalendarStatus, string> = { draft: "Taslak", scheduled: "Planlandı", publishing: "Yayınlanıyor", published: "Yayınlandı", failed: "Başarısız" };
+const statusStyles: Record<ContentCalendarStatus, string> = { draft: "bg-zinc-500/15 text-zinc-300", scheduled: "bg-sky-400/15 text-sky-200", publishing: "bg-amber-400/15 text-amber-200", published: "bg-emerald-400/15 text-emerald-200", failed: "bg-red-400/15 text-red-200" };
 
-type PostResponse = {
-  data?: ScheduledPost;
-  error?: string;
-};
-
-type MediaResponse = {
-  data?: MediaAsset[];
-  error?: string;
-};
-
-const platforms: Array<{ value: CalendarPlatform; label: string }> = [
-  { value: "instagram", label: "Instagram" },
-  { value: "facebook", label: "Facebook" },
-  { value: "twitter", label: "X" },
-  { value: "tiktok", label: "TikTok" },
-  { value: "linkedin", label: "LinkedIn" },
-];
-
-const statuses: Array<{ value: CalendarStatus; label: string }> = [
-  { value: "draft", label: "Taslak" },
-  { value: "scheduled", label: "Planlandı" },
-  { value: "published", label: "Yayınlandı" },
-  { value: "failed", label: "Başarısız" },
-];
-
-const viewLabels: Record<CalendarView, string> = {
-  month: "Month",
-  week: "Week",
-  day: "Day",
-};
-
-const statusClasses: Record<CalendarStatus, string> = {
-  draft: "border-zinc-500/30 bg-zinc-500/10 text-zinc-200",
-  scheduled: "border-sky-400/30 bg-sky-400/10 text-sky-100",
-  published: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
-  failed: "border-red-400/30 bg-red-500/10 text-red-100",
-};
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
+function startDay(value: Date) { const date = new Date(value); date.setHours(0, 0, 0, 0); return date; }
+function addDays(value: Date, count: number) { const date = new Date(value); date.setDate(date.getDate() + count); return date; }
+function startWeek(value: Date) { const date = startDay(value); return addDays(date, -((date.getDay() + 6) % 7)); }
+function daysFor(view: CalendarView, cursor: Date) {
+  if (view === "week") return Array.from({ length: 7 }, (_, index) => addDays(startWeek(cursor), index));
+  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+  return Array.from({ length: 42 }, (_, index) => addDays(startWeek(first), index));
 }
+function dateKey(value: Date | string) { const date = new Date(value); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
+function localInput(value: string) { const date = new Date(value); const offset = date.getTimezoneOffset() * 60000; return new Date(date.getTime() - offset).toISOString().slice(0, 16); }
+function range(view: CalendarView, cursor: Date) { const days = daysFor(view, cursor); return { from: days[0], to: addDays(days[days.length - 1], 1) }; }
 
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function startOfWeek(date: Date) {
-  const next = startOfDay(date);
-  const day = (next.getDay() + 6) % 7;
-  return addDays(next, -day);
-}
-
-function monthDays(date: Date) {
-  const first = new Date(date.getFullYear(), date.getMonth(), 1);
-  const start = startOfWeek(first);
-  return Array.from({ length: 42 }, (_, index) => addDays(start, index));
-}
-
-function weekDays(date: Date) {
-  const start = startOfWeek(date);
-  return Array.from({ length: 7 }, (_, index) => addDays(start, index));
-}
-
-function dayKey(value: Date | string | null | undefined) {
-  if (!value) return "";
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function datetimeLocal(value: string | null | undefined) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return `${dayKey(date)}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
-
-function isoFromLocal(value: string) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function movePostToDay(post: ScheduledPost, date: Date) {
-  const current = post.scheduledAt ? new Date(post.scheduledAt) : new Date();
-  const next = new Date(date);
-  next.setHours(current.getHours(), current.getMinutes(), 0, 0);
-  return next.toISOString();
-}
-
-function formatTime(value: string | null | undefined) {
-  if (!value) return "Saat yok";
-  return new Date(value).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-}
-
-function rangeForView(view: CalendarView, cursor: Date) {
-  if (view === "day") {
-    return { from: startOfDay(cursor), to: addDays(startOfDay(cursor), 1) };
-  }
-
-  if (view === "week") {
-    const from = startOfWeek(cursor);
-    return { from, to: addDays(from, 7) };
-  }
-
-  const days = monthDays(cursor);
-  return { from: days[0], to: addDays(days[days.length - 1], 1) };
-}
-
-function postDateLabel(value: string | null | undefined) {
-  if (!value) return "Taslak";
-  return new Date(value).toLocaleString("tr-TR", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function MediaThumb({ media }: { media: MediaAsset | null }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    let active = true;
+    if (!media?.storagePath) return;
+    fetch(`/api/media/${media.id}/signed-url`, { method: "POST" }).then((response) => response.json()).then((json: { data?: { signedUrl?: string } }) => { if (active) setUrl(json.data?.signedUrl || ""); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [media]);
+  if (!media) return <div className="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-white/5 text-[10px] font-bold text-zinc-500">METİN</div>;
+  if (!url) return <div className="h-14 w-14 shrink-0 animate-pulse rounded-md bg-white/5" />;
+  return media.type === "video" ? <video src={url} muted className="h-14 w-14 shrink-0 rounded-md bg-black object-cover" /> : <Image src={url} alt="" width={56} height={56} unoptimized className="h-14 w-14 shrink-0 rounded-md bg-black object-cover" />;
 }
 
 export function CalendarClient() {
-  const [posts, setPosts] = useState<ScheduledPost[]>([]);
-  const [mediaItems, setMediaItems] = useState<MediaAsset[]>([]);
+  const [items, setItems] = useState<ContentCalendarItem[]>([]);
+  const [media, setMedia] = useState<MediaAsset[]>([]);
+  const [connections, setConnections] = useState<SafeSocialConnection[]>([]);
   const [view, setView] = useState<CalendarView>("month");
-  const [cursor, setCursor] = useState(() => new Date());
-  const [platformFilter, setPlatformFilter] = useState<CalendarPlatform | "all">("all");
+  const [cursor, setCursor] = useState(new Date());
+  const [filter, setFilter] = useState<SocialPlatform | "all">("all");
   const [selectedId, setSelectedId] = useState("");
-  const [title, setTitle] = useState("");
-  const [caption, setCaption] = useState("");
-  const [platform, setPlatform] = useState<CalendarPlatform>("instagram");
-  const [status, setStatus] = useState<CalendarStatus>("scheduled");
-  const [mediaAssetId, setMediaAssetId] = useState("");
-  const [scheduledAt, setScheduledAt] = useState(() => datetimeLocal(new Date().toISOString()));
+  const [title, setTitle] = useState(""); const [caption, setCaption] = useState("");
+  const [mediaId, setMediaId] = useState(""); const [platforms, setPlatforms] = useState<SocialPlatform[]>([]);
+  const [scheduledAt, setScheduledAt] = useState(() => localInput(new Date(Date.now() + 3600000).toISOString()));
   const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [status, setStatus] = useState<"draft" | "scheduled">("scheduled");
+  const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(""); const [notice, setNotice] = useState("");
 
-  const visibleDays = useMemo(() => {
-    if (view === "day") return [startOfDay(cursor)];
-    if (view === "week") return weekDays(cursor);
-    return monthDays(cursor);
-  }, [cursor, view]);
+  const connectedPlatforms = useMemo(() => [...new Set(connections.filter((item) => item.status === "connected").map((item) => item.platform))], [connections]);
+  const visibleDays = useMemo(() => daysFor(view, cursor), [view, cursor]);
+  const grouped = useMemo(() => items.reduce<Record<string, ContentCalendarItem[]>>((result, item) => { const key = dateKey(item.scheduledAt); (result[key] ||= []).push(item); return result; }, {}), [items]);
 
-  const selectedPost = posts.find((post) => post.id === selectedId) || null;
-
-  async function loadData() {
-    setLoading(true);
-    setError("");
-
+  const load = useCallback(async () => {
+    setLoading(true); setError("");
     try {
-      const range = rangeForView(view, cursor);
-      const params = new URLSearchParams({
-        from: range.from.toISOString(),
-        to: range.to.toISOString(),
-        platform: platformFilter,
-      });
-      const [calendarResponse, mediaResponse] = await Promise.all([
-        fetch(`/api/calendar?${params.toString()}`),
-        fetch("/api/media?sort=newest"),
-      ]);
-      const calendarJson = (await calendarResponse.json()) as CalendarResponse;
-      const mediaJson = (await mediaResponse.json()) as MediaResponse;
+      const dates = range(view, cursor); const params = new URLSearchParams({ from: dates.from.toISOString(), to: dates.to.toISOString() }); if (filter !== "all") params.set("platform", filter);
+      const [calendarResult, mediaResult, connectionResult] = await Promise.all([fetch(`/api/calendar?${params}`), fetch("/api/media?sort=newest"), fetch("/api/connections")]);
+      const calendarJson = await calendarResult.json() as CalendarResponse; const mediaJson = await mediaResult.json() as MediaResponse; const connectionJson = await connectionResult.json() as ConnectionResponse;
+      if (!calendarResult.ok || !calendarJson.data) throw new Error(calendarJson.error || "Takvim yüklenemedi.");
+      setItems(calendarJson.data); if (mediaResult.ok && mediaJson.data) setMedia(mediaJson.data.filter((item) => item.type === "image" || item.type === "video"));
+      if (connectionResult.ok && connectionJson.data) setConnections(connectionJson.data);
+    } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Takvim yüklenemedi."); } finally { setLoading(false); }
+  }, [cursor, filter, view]);
 
-      if (!calendarResponse.ok || !calendarJson.data) {
-        throw new Error(calendarJson.error || "Takvim yüklenemedi.");
-      }
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
 
-      setPosts(calendarJson.data);
+  function reset(day = new Date()) { setSelectedId(""); setTitle(""); setCaption(""); setMediaId(""); setPlatforms([]); setStatus("scheduled"); setScheduledAt(localInput(day.toISOString())); setNotice(""); }
+  function edit(item: ContentCalendarItem) { setSelectedId(item.id); setTitle(item.title); setCaption(item.caption); setMediaId(item.mediaAssetId || ""); setPlatforms(item.platforms); setStatus(item.status === "draft" ? "draft" : "scheduled"); setScheduledAt(localInput(item.scheduledAt)); setTimezone(item.timezone); }
+  function togglePlatform(platform: SocialPlatform) { setPlatforms((current) => current.includes(platform) ? current.filter((item) => item !== platform) : [...current, platform]); }
 
-      if (mediaResponse.ok && mediaJson.data) {
-        setMediaItems(mediaJson.data.filter((item) => item.type === "image" || item.type === "video"));
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Takvim yüklenemedi.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadData();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, cursor, platformFilter]);
-
-  function resetForm(date?: Date) {
-    setSelectedId("");
-    setTitle("");
-    setCaption("");
-    setPlatform(platformFilter === "all" ? "instagram" : platformFilter);
-    setStatus("scheduled");
-    setMediaAssetId("");
-    setScheduledAt(datetimeLocal((date || new Date()).toISOString()));
-  }
-
-  function editPost(post: ScheduledPost) {
-    setSelectedId(post.id);
-    setTitle(post.title);
-    setCaption(post.caption);
-    setPlatform(post.platform);
-    setStatus(post.status);
-    setMediaAssetId(post.mediaAssetId || "");
-    setScheduledAt(datetimeLocal(post.scheduledAt || new Date().toISOString()));
-    setTimezone(post.timezone || timezone);
-  }
-
-  async function savePost() {
-    if (!title.trim()) {
-      setError("Başlık yazmalısın.");
-      return;
-    }
-
-    if (status === "scheduled" && !scheduledAt) {
-      setError("Planlanan saat seçmelisin.");
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-    setNotice("");
-
-    const payload = {
-      title,
-      caption,
-      platform,
-      status,
-      mediaAssetId: mediaAssetId || null,
-      scheduledAt: status === "draft" ? null : isoFromLocal(scheduledAt),
-      timezone,
-    };
-
+  async function save() {
+    if (!title.trim()) return setError("Başlık yazmalısın."); if (platforms.length === 0) return setError("En az bir bağlı platform seçmelisin.");
+    setSaving(true); setError(""); setNotice("");
     try {
-      const response = await fetch(selectedId ? `/api/calendar/${selectedId}` : "/api/calendar", {
-        method: selectedId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = (await response.json()) as PostResponse;
-
-      if (!response.ok || !json.data) {
-        throw new Error(json.error || "Plan kaydedilemedi.");
-      }
-
-      setNotice(selectedId ? "Plan güncellendi." : "Plan oluşturuldu.");
-      editPost(json.data);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Plan kaydedilemedi.");
-    } finally {
-      setSaving(false);
-    }
+      const response = await fetch(selectedId ? `/api/calendar/${selectedId}` : "/api/calendar", { method: selectedId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, caption, mediaAssetId: mediaId || null, platforms, status, scheduledAt: new Date(scheduledAt).toISOString(), timezone }) });
+      const json = await response.json() as { data?: ContentCalendarItem; error?: string }; if (!response.ok || !json.data) throw new Error(json.error || "Plan kaydedilemedi.");
+      edit(json.data); setNotice(selectedId ? "Plan güncellendi." : "Plan oluşturuldu."); await load();
+    } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "Plan kaydedilemedi."); } finally { setSaving(false); }
   }
 
-  async function deletePost() {
-    if (!selectedId) return;
+  async function remove() { if (!selectedId || !window.confirm("Bu planı silmek istiyor musun?")) return; setSaving(true); const response = await fetch(`/api/calendar/${selectedId}`, { method: "DELETE" }); setSaving(false); if (!response.ok) return setError("Plan silinemedi."); reset(); setNotice("Plan silindi."); await load(); }
+  async function duplicate() { if (!selectedId) return; setSaving(true); const response = await fetch(`/api/calendar/${selectedId}`, { method: "POST" }); const json = await response.json() as { data?: ContentCalendarItem; error?: string }; setSaving(false); if (!response.ok || !json.data) return setError(json.error || "Plan kopyalanamadı."); edit(json.data); setNotice("Plan taslak olarak kopyalandı."); await load(); }
 
-    setSaving(true);
-    setError("");
+  const heading = view === "month" ? cursor.toLocaleDateString("tr-TR", { month: "long", year: "numeric" }) : `${visibleDays[0].toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })} - ${visibleDays[6].toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })}`;
 
-    try {
-      const response = await fetch(`/api/calendar/${selectedId}`, { method: "DELETE" });
-      const json = (await response.json()) as { error?: string };
-
-      if (!response.ok) throw new Error(json.error || "Plan silinemedi.");
-
-      setNotice("Plan silindi.");
-      resetForm();
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Plan silinemedi.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function publishNow() {
-    if (!selectedId) return;
-
-    setSaving(true);
-    setError("");
-
-    try {
-      const response = await fetch(`/api/calendar/${selectedId}/publish`, { method: "POST" });
-      const json = (await response.json()) as PostResponse;
-
-      if (!response.ok || !json.data) {
-        throw new Error(json.error || "Paylaşım yapılamadı.");
-      }
-
-      setNotice("Paylaşım tamamlandı.");
-      editPost(json.data);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Paylaşım yapılamadı.");
-      await loadData();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function moveScheduledPost(postId: string, date: Date) {
-    const post = posts.find((item) => item.id === postId);
-    if (!post) return;
-
-    const nextDate = movePostToDay(post, date);
-    const response = await fetch(`/api/calendar/${postId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scheduledAt: nextDate, status: post.status === "draft" ? "scheduled" : post.status }),
-    });
-
-    if (!response.ok) {
-      const json = (await response.json()) as { error?: string };
-      setError(json.error || "Plan taşınamadı.");
-      return;
-    }
-
-    await loadData();
-  }
-
-  const postsByDay = useMemo(() => {
-    return posts.reduce<Record<string, ScheduledPost[]>>((groups, post) => {
-      const key = dayKey(post.scheduledAt);
-      if (!key) return groups;
-      groups[key] = [...(groups[key] || []), post];
-      return groups;
-    }, {});
-  }, [posts]);
-
-  const titleLabel =
-    view === "month"
-      ? cursor.toLocaleDateString("tr-TR", { month: "long", year: "numeric" })
-      : view === "week"
-        ? `${weekDays(cursor)[0].toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })} - ${weekDays(cursor)[6].toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })}`
-        : cursor.toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
-
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(340px,430px)_1fr]">
-      <Card className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Plan oluştur</p>
-            <h2 className="mt-2 text-xl font-black text-white">{selectedPost ? "Planı düzenle" : "Yeni paylaşım"}</h2>
-          </div>
-          <Button type="button" variant="secondary" onClick={() => resetForm()}>
-            Yeni
-          </Button>
-        </div>
-
-        <div className="mt-5 grid gap-4">
-          <label className="block text-sm font-semibold text-zinc-200">
-            Başlık
-            <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm outline-none transition placeholder:text-zinc-600 focus:border-emerald-300"
-              placeholder="Hafta sonu kampanya duyurusu"
-            />
-          </label>
-
-          <label className="block text-sm font-semibold text-zinc-200">
-            Metin
-            <textarea
-              value={caption}
-              onChange={(event) => setCaption(event.target.value)}
-              rows={5}
-              className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-zinc-600 focus:border-emerald-300"
-              placeholder="Paylaşım metnini yaz..."
-            />
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-semibold text-zinc-200">
-              Platform
-              <select value={platform} onChange={(event) => setPlatform(event.target.value as CalendarPlatform)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm font-semibold text-zinc-100 outline-none focus:border-emerald-300">
-                {platforms.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block text-sm font-semibold text-zinc-200">
-              Durum
-              <select value={status} onChange={(event) => setStatus(event.target.value as CalendarStatus)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm font-semibold text-zinc-100 outline-none focus:border-emerald-300">
-                {statuses.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <label className="block text-sm font-semibold text-zinc-200">
-            Medya
-            <select value={mediaAssetId} onChange={(event) => setMediaAssetId(event.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm font-semibold text-zinc-100 outline-none focus:border-emerald-300">
-              <option value="">Medya seçme</option>
-              {mediaItems.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.type === "video" ? "Video" : "Görsel"} - {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-semibold text-zinc-200">
-              Zaman
-              <input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm font-semibold text-zinc-100 outline-none focus:border-emerald-300" />
-            </label>
-            <label className="block text-sm font-semibold text-zinc-200">
-              Zaman dilimi
-              <input value={timezone} onChange={(event) => setTimezone(event.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm font-semibold text-zinc-100 outline-none focus:border-emerald-300" />
-            </label>
-          </div>
-
-          {error && <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm font-semibold text-red-200">{error}</div>}
-          {notice && <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm font-semibold text-emerald-100">{notice}</div>}
-
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button type="button" onClick={savePost} disabled={saving}>
-              {saving ? "Kaydediliyor" : selectedPost ? "Güncelle" : "Planla"}
-            </Button>
-            <Button type="button" variant="secondary" onClick={publishNow} disabled={!selectedPost || saving}>
-              Şimdi paylaş
-            </Button>
-          </div>
-
-          {selectedPost && (
-            <Button type="button" variant="secondary" onClick={deletePost} disabled={saving}>
-              Planı sil
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      <div className="grid gap-5">
-        <Card className="p-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Takvim</p>
-              <h2 className="mt-2 text-2xl font-black capitalize text-white">{titleLabel}</h2>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {(["month", "week", "day"] as CalendarView[]).map((item) => (
-                <button key={item} type="button" onClick={() => setView(item)} className={`rounded-lg border px-3 py-2 text-sm font-black transition ${view === item ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100" : "border-white/10 bg-white/[0.03] text-zinc-400 hover:text-white"}`}>
-                  {viewLabels[item]}
-                </button>
-              ))}
-              <select value={platformFilter} onChange={(event) => setPlatformFilter(event.target.value as CalendarPlatform | "all")} className="rounded-lg border border-white/10 bg-zinc-950 px-3 py-2 text-sm font-semibold text-zinc-100 outline-none">
-                <option value="all">Tüm platformlar</option>
-                {platforms.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-              <Button type="button" variant="secondary" onClick={() => setCursor(addDays(cursor, view === "month" ? -30 : view === "week" ? -7 : -1))}>
-                Önceki
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setCursor(new Date())}>
-                Bugün
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setCursor(addDays(cursor, view === "month" ? 30 : view === "week" ? 7 : 1))}>
-                Sonraki
-              </Button>
-            </div>
-          </div>
-        </Card>
-
-        {loading ? (
-          <Card className="p-5">
-            <div className="grid gap-3 md:grid-cols-7">
-              {Array.from({ length: view === "day" ? 1 : view === "week" ? 7 : 42 }).map((_, index) => (
-                <div key={index} className="h-32 animate-pulse rounded-lg bg-white/5" />
-              ))}
-            </div>
-          </Card>
-        ) : visibleDays.length === 0 ? (
-          <EmptyState title="Takvim boş" description="Medya Merkezinden bir görsel veya video seçip paylaşım planı oluştur." />
-        ) : (
-          <div className={`grid gap-3 ${view === "day" ? "grid-cols-1" : "md:grid-cols-7"}`}>
-            {visibleDays.map((day) => {
-              const key = dayKey(day);
-              const dayPosts = postsByDay[key] || [];
-              const inCurrentMonth = day.getMonth() === cursor.getMonth();
-
-              return (
-                <Card
-                  key={key}
-                  className={`min-h-36 p-3 ${view === "month" && !inCurrentMonth ? "opacity-50" : ""}`}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    const postId = event.dataTransfer.getData("text/plain");
-                    if (postId) void moveScheduledPost(postId, day);
-                  }}
-                >
-                  <button type="button" onClick={() => resetForm(day)} className="flex w-full items-center justify-between text-left">
-                    <span className="text-sm font-black text-white">{day.toLocaleDateString("tr-TR", { day: "2-digit" })}</span>
-                    <span className="text-xs text-zinc-500">{day.toLocaleDateString("tr-TR", { weekday: "short" })}</span>
-                  </button>
-                  <div className="mt-3 space-y-2">
-                    {dayPosts.map((post) => (
-                      <button
-                        key={post.id}
-                        type="button"
-                        draggable
-                        onDragStart={(event) => event.dataTransfer.setData("text/plain", post.id)}
-                        onClick={() => editPost(post)}
-                        className={`w-full rounded-lg border p-2 text-left transition hover:bg-white/5 ${selectedId === post.id ? "border-emerald-400/50" : "border-white/10"}`}
-                      >
-                        <span className="block truncate text-xs font-black text-white">{post.title}</span>
-                        <span className="mt-1 block text-[11px] text-zinc-500">
-                          {formatTime(post.scheduledAt)} · {platforms.find((item) => item.value === post.platform)?.label}
-                        </span>
-                        <span className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusClasses[post.status]}`}>
-                          {statuses.find((item) => item.value === post.status)?.label}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-
-        <Card className="p-5">
-          <h2 className="text-lg font-black text-white">Yaklaşan planlar</h2>
-          <div className="mt-4 grid gap-3">
-            {posts.filter((post) => post.status === "scheduled").slice(0, 5).length === 0 ? (
-              <p className="text-sm text-zinc-500">Yaklaşan plan yok.</p>
-            ) : (
-              posts
-                .filter((post) => post.status === "scheduled")
-                .slice(0, 5)
-                .map((post) => (
-                  <button key={post.id} type="button" onClick={() => editPost(post)} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-left">
-                    <span>
-                      <span className="block text-sm font-black text-white">{post.title}</span>
-                      <span className="mt-1 block text-xs text-zinc-500">{postDateLabel(post.scheduledAt)}</span>
-                    </span>
-                    <span className="text-xs font-bold text-emerald-200">{platforms.find((item) => item.value === post.platform)?.label}</span>
-                  </button>
-                ))
-            )}
-          </div>
-        </Card>
+  return <div className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
+    <Card className="p-5"><div className="flex items-center justify-between"><div><p className="text-xs uppercase tracking-[0.16em] text-zinc-500">İçerik planı</p><h2 className="mt-2 text-xl font-black">{selectedId ? "Planı düzenle" : "Yeni plan"}</h2></div><Button variant="secondary" onClick={() => reset()}>Yeni</Button></div>
+      <div className="mt-5 grid gap-4">
+        <label className="text-sm font-semibold">Başlık<input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 outline-none focus:border-emerald-300" /></label>
+        <label className="text-sm font-semibold">Açıklama<textarea value={caption} onChange={(event) => setCaption(event.target.value)} rows={4} className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 outline-none focus:border-emerald-300" /></label>
+        <label className="text-sm font-semibold">Medya<select value={mediaId} onChange={(event) => setMediaId(event.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3"><option value="">Medya seçme</option>{media.map((item) => <option key={item.id} value={item.id}>{item.type === "video" ? "Video" : "Görsel"} · {item.name}</option>)}</select></label>
+        <div><p className="text-sm font-semibold">Bağlı platformlar</p>{connectedPlatforms.length ? <div className="mt-2 grid grid-cols-2 gap-2">{connectedPlatforms.map((platform) => <label key={platform} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm ${platforms.includes(platform) ? "border-emerald-400/40 bg-emerald-400/10" : "border-white/10"}`}><input type="checkbox" checked={platforms.includes(platform)} onChange={() => togglePlatform(platform)} />{platformNames[platform]}</label>)}</div> : <p className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-100">Bağlı hesap yok. <Link href="/connections" className="font-bold underline">Bağlantılara git</Link></p>}</div>
+        <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-semibold">Tarih ve saat<input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-3 py-3" /></label><label className="text-sm font-semibold">Durum<select value={status} onChange={(event) => setStatus(event.target.value as "draft" | "scheduled")} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-3 py-3"><option value="scheduled">Planlandı</option><option value="draft">Taslak</option></select></label></div>
+        <label className="text-sm font-semibold">Zaman dilimi<input value={timezone} onChange={(event) => setTimezone(event.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3" /></label>
+        {error && <p className="rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200">{error}</p>}{notice && <p className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">{notice}</p>}
+        <Button onClick={() => void save()} disabled={saving}>{saving ? "Kaydediliyor" : selectedId ? "Güncelle" : "Planla"}</Button>{selectedId && <div className="grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => void duplicate()} disabled={saving}>Kopyala</Button><Button variant="secondary" onClick={() => void remove()} disabled={saving}>Sil</Button></div>}
       </div>
+    </Card>
+    <div className="min-w-0"><Card className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Takvim</p><h2 className="mt-2 text-2xl font-black capitalize">{heading}</h2></div><div className="flex flex-wrap gap-2"><div className="inline-flex rounded-lg border border-white/10 p-1">{(["month", "week"] as CalendarView[]).map((option) => <button key={option} onClick={() => setView(option)} className={`rounded-md px-3 py-2 text-sm font-bold ${view === option ? "bg-white text-zinc-950" : "text-zinc-400"}`}>{option === "month" ? "Ay" : "Hafta"}</button>)}</div><select value={filter} onChange={(event) => setFilter(event.target.value as SocialPlatform | "all")} className="rounded-lg border border-white/10 bg-zinc-950 px-3 text-sm"><option value="all">Tüm platformlar</option>{connectedPlatforms.map((platform) => <option key={platform} value={platform}>{platformNames[platform]}</option>)}</select><Button variant="secondary" onClick={() => setCursor(addDays(cursor, view === "month" ? -30 : -7))}>Önceki</Button><Button variant="secondary" onClick={() => setCursor(new Date())}>Bugün</Button><Button variant="secondary" onClick={() => setCursor(addDays(cursor, view === "month" ? 30 : 7))}>Sonraki</Button></div></div></Card>
+      <div className="mt-4 overflow-x-auto">{loading ? <div className="grid min-w-[840px] grid-cols-7 gap-2">{Array.from({ length: view === "month" ? 42 : 7 }, (_, index) => <div key={index} className="h-40 animate-pulse rounded-lg border border-white/10 bg-white/5" />)}</div> : error && items.length === 0 ? <Card className="p-8 text-center"><p>{error}</p><Button className="mt-4" onClick={() => void load()}>Tekrar dene</Button></Card> : items.length === 0 ? <EmptyState title="Takvim boş" description="İlk içerik planını oluşturarak paylaşım akışını düzenlemeye başla." /> : <div className="grid min-w-[840px] grid-cols-7 gap-2">{visibleDays.map((day) => <div key={day.toISOString()} className={`min-h-40 rounded-lg border p-2 ${day.getMonth() === cursor.getMonth() || view === "week" ? "border-white/10 bg-[#111113]" : "border-white/5 bg-white/[0.02]"}`}><button onClick={() => reset(day)} className="mb-2 text-xs font-bold text-zinc-400 hover:text-white">{day.toLocaleDateString("tr-TR", { day: "2-digit", weekday: "short" })}</button><div className="space-y-2">{(grouped[dateKey(day)] || []).map((item) => <button key={item.id} onClick={() => edit(item)} className="w-full rounded-md border border-white/10 bg-white/[0.04] p-2 text-left hover:border-emerald-400/30"><div className="flex gap-2"><MediaThumb media={item.media} /><div className="min-w-0"><p className="truncate text-xs font-black">{item.title}</p><p className="mt-1 line-clamp-2 text-[11px] leading-4 text-zinc-500">{item.caption || "Açıklama yok"}</p></div></div><div className="mt-2 flex items-center justify-between gap-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${statusStyles[item.status]}`}>{statusNames[item.status]}</span><span className="text-[10px] text-zinc-500">{new Date(item.scheduledAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span></div><div className="mt-2 flex flex-wrap gap-1">{item.platforms.map((platform) => <span key={platform} className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] text-zinc-400">{platformNames[platform]}</span>)}</div></button>)}</div></div>)}</div>}</div>
     </div>
-  );
+  </div>;
 }

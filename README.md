@@ -45,6 +45,7 @@ Create `.env.local` from `.env.example` and fill real values locally. Never hard
 
 ```env
 GROQ_API_KEY=gsk_your_groq_key
+RUNWAY_API_KEY=your_runway_api_key
 
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_publishable_key
 CLERK_SECRET_KEY=sk_test_your_secret_key
@@ -57,6 +58,8 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_server_only_service_role_key
 ```
+
+`RUNWAY_API_KEY` is required by the server-side AI Video Studio. Store the real Runway API key only in `.env.local`; never prefix it with `NEXT_PUBLIC_` or expose it to browser code.
 
 ## Database Setup
 

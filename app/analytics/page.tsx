@@ -10,8 +10,8 @@ export default async function AnalyticsPage() {
       <div className="flex min-h-screen flex-col lg:flex-row">
         <Sidebar active="Analytics" />
         <section className="min-w-0 flex-1 px-5 py-6 sm:px-8 lg:px-10 lg:py-8">
-          <Navbar title="Analytics">
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">BrandFlow içindeki medya, planlama ve AI Advisor kullanımını gerçek verilerle takip et.</p>
+          <Navbar title="Analytics Dashboard">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">Medya, planlama, bağlantı ve abonelik kullanımını yalnızca gerçek BrandFlow verileriyle takip et.</p>
           </Navbar>
           <div className="pt-6"><AnalyticsClient /></div>
         </section>

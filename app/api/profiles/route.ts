@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { createUserProfile, listUserProfiles } from "@/lib/profiles/server";
 import { profileInputError, sanitizeProfileInput } from "@/lib/profiles/validation";
+import { getUserBillingPlan } from "@/lib/billing/server";
 
 export async function GET() {
   const { userId } = await auth();
@@ -18,6 +19,11 @@ export async function POST(req: Request) {
 
   if (!userId) {
     return Response.json({ error: "Profil için giriş yapmanız gerekiyor." }, { status: 401 });
+  }
+
+  const [{ profiles }, billing] = await Promise.all([listUserProfiles(userId), getUserBillingPlan(userId)]);
+  if (billing.plan.profileLimit !== null && profiles.length >= billing.plan.profileLimit) {
+    return Response.json({ error: `Bu plan en fazla ${billing.plan.profileLimit} profil destekliyor. Daha fazlası için Business planına geçebilirsin.` }, { status: 403 });
   }
 
   const body = await req.json();

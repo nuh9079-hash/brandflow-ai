@@ -32,7 +32,7 @@ export function LineChart({ title, helper, data, suffix = "" }: { title: string;
 
 export function BarChart({ title, helper, data }: { title: string; helper: string; data: DistributionPoint[] }) {
   const max = Math.max(...data.map((point) => point.value), 1);
-  const labels: Record<string, string> = { draft: "Taslak", scheduled: "Planlandı", published: "Yayınlandı", failed: "Başarısız", twitter: "X" };
+  const labels: Record<string, string> = { draft: "Taslak", scheduled: "Planlandı", publishing: "Yayınlanıyor", published: "Yayınlandı", failed: "Başarısız", twitter: "X", x: "X" };
   return (
     <Card className="p-5">
       <h2 className="text-base font-black text-white">{title}</h2>

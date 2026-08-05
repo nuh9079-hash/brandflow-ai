@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState } from "@/components/ui";
 import type { MediaAsset } from "@/lib/media/types";
 
-type VideoStatus = "preparing" | "submitting" | "processing" | "completed" | "failed";
+type VideoStatus = "preparing" | "queued" | "processing" | "completed" | "failed";
 type VideoStyle = "Cinematic" | "Funny" | "Product Promotion" | "Social Media" | "Realistic";
 type VideoAspectRatio = "9:16" | "1:1" | "16:9";
 
@@ -51,7 +51,7 @@ const fallbackStyles: VideoStyle[] = ["Cinematic", "Funny", "Product Promotion",
 
 const statusLabels: Record<VideoStatus, string> = {
   preparing: "preparing",
-  submitting: "submitting",
+  queued: "queued",
   processing: "processing",
   completed: "completed",
   failed: "failed",
@@ -59,7 +59,7 @@ const statusLabels: Record<VideoStatus, string> = {
 
 const statusDescriptions: Record<VideoStatus, string> = {
   preparing: "İstek hazırlanıyor.",
-  submitting: "Video sağlayıcısına gönderiliyor.",
+  queued: "Video üretim kuyruğuna alındı.",
   processing: "Video sağlayıcısı üretimi sürdürüyor.",
   completed: "Video hazır ve Medya Merkezine kaydedildi.",
   failed: "Video üretimi tamamlanamadı.",
@@ -98,6 +98,7 @@ export function VideoStudioClient() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [mediaAction, setMediaAction] = useState<"favorite" | "delete" | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -159,18 +160,13 @@ export function VideoStudioClient() {
   const durationOptions = capabilities?.supportedDurations ?? [5, 10];
   const styleOptions = capabilities?.styles?.length ? capabilities.styles : fallbackStyles;
 
-  async function pollVideoJob(jobId: string, enhancedPrompt: string) {
+  async function pollVideoJob(jobId: string) {
     setStatus("processing");
 
     for (let attempt = 0; attempt < 90; attempt += 1) {
       await delay(attempt === 0 ? 1200 : 4000);
 
-      const params = new URLSearchParams({
-        jobId,
-        prompt: enhancedPrompt,
-        aspectRatio,
-        duration: String(duration),
-      });
+      const params = new URLSearchParams({ jobId });
       const response = await fetch(`/api/video-studio/generate?${params.toString()}`);
       const data = (await response.json()) as VideoStudioResponse;
 
@@ -211,7 +207,7 @@ export function VideoStudioClient() {
 
     try {
       await delay(200);
-      setStatus("submitting");
+      setStatus("queued");
 
       const response = await fetch("/api/video-studio/generate", {
         method: "POST",
@@ -240,7 +236,7 @@ export function VideoStudioClient() {
         throw new Error("Video sağlayıcısı job ID döndürmedi.");
       }
 
-      await pollVideoJob(data.data.jobId, data.data.prompt || prompt);
+      await pollVideoJob(data.data.jobId);
     } catch (err) {
       setStatus("failed");
       setError(err instanceof Error ? err.message : "Video üretilemedi. Lütfen tekrar dene.");
@@ -280,6 +276,42 @@ export function VideoStudioClient() {
       setError("Video indirilemedi. Lütfen tekrar dene.");
     } finally {
       setDownloading(false);
+    }
+  }
+
+  async function toggleFavorite() {
+    if (!result?.media) return;
+    setMediaAction("favorite");
+    setError("");
+    try {
+      const response = await fetch(`/api/media/${result.media.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFavorite: !result.media.isFavorite }),
+      });
+      const json = (await response.json()) as { data?: MediaAsset; error?: string };
+      if (!response.ok || !json.data) throw new Error(json.error || "Favori durumu güncellenemedi.");
+      setResult((current) => current ? { ...current, media: json.data } : current);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Favori durumu güncellenemedi.");
+    } finally {
+      setMediaAction(null);
+    }
+  }
+
+  async function deleteVideo() {
+    if (!result?.media || !window.confirm("Bu videoyu Medya Merkezinden kalıcı olarak silmek istiyor musun?")) return;
+    setMediaAction("delete");
+    setError("");
+    try {
+      const response = await fetch(`/api/media/${result.media.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Video silinemedi.");
+      setResult(null);
+      setStatus(null);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Video silinemedi.");
+    } finally {
+      setMediaAction(null);
     }
   }
 
@@ -468,6 +500,12 @@ export function VideoStudioClient() {
                 <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
                   <Button type="button" onClick={downloadVideo} disabled={downloading}>
                     {downloading ? "İndiriliyor" : "İndir"}
+                  </Button>
+                  <Button type="button" variant="secondary" disabled={Boolean(mediaAction)} onClick={() => void toggleFavorite()}>
+                    {mediaAction === "favorite" ? "Kaydediliyor" : result.media.isFavorite ? "Favoriden Çıkar" : "Favoriye Ekle"}
+                  </Button>
+                  <Button type="button" variant="secondary" disabled={Boolean(mediaAction)} onClick={() => void deleteVideo()}>
+                    {mediaAction === "delete" ? "Siliniyor" : "Sil"}
                   </Button>
                   <Link href="/media">
                     <Button type="button" variant="secondary" className="w-full">

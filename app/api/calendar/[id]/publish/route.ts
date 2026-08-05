@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { getPublisher } from "@/lib/calendar/providers/registry";
 import { getScheduledPost, updateScheduledPost } from "@/lib/calendar/server";
+import { requireBillingFeature } from "@/lib/billing/server";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -16,6 +17,8 @@ export async function POST(_req: Request, context: RouteContext) {
   if (!userId) {
     return calendarError("Paylaşım için giriş yapmalısın.", 401);
   }
+  const access = await requireBillingFeature(userId, "calendar");
+  if (!access.ok) return calendarError(access.error, access.status);
 
   const { id } = await context.params;
   const post = await getScheduledPost(userId, id);

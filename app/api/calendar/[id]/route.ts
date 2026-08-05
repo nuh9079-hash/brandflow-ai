@@ -1,50 +1,34 @@
 import { auth } from "@clerk/nextjs/server";
-import { deleteScheduledPost, sanitizeScheduledPostUpdate, updateScheduledPost } from "@/lib/calendar/server";
+import { requireBillingFeature } from "@/lib/billing/server";
+import { deleteContent, duplicateContent, sanitizeContentUpdate, updateContent } from "@/lib/calendar/content";
 
-type RouteContext = {
-  params: Promise<{ id: string }>;
-};
+type Context = { params: Promise<{ id: string }> };
 
-function calendarError(message: string, status = 400) {
-  return Response.json({ error: message }, { status });
+async function identify(context: Context) { return (await context.params).id; }
+async function authorize() {
+  const { userId } = await auth();
+  if (!userId) return { error: Response.json({ error: "Giriş yapmalısın." }, { status: 401 }) };
+  const access = await requireBillingFeature(userId, "calendar");
+  if (!access.ok) return { error: Response.json({ error: access.error }, { status: access.status }) };
+  return { userId };
 }
 
-export async function PATCH(req: Request, context: RouteContext) {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return calendarError("Planı düzenlemek için giriş yapmalısın.", 401);
-  }
-
-  const { id } = await context.params;
-  const input = sanitizeScheduledPostUpdate(await req.json());
-
-  if (!input) {
-    return calendarError("Plan bilgilerini kontrol et.", 400);
-  }
-
-  const result = await updateScheduledPost(userId, id, input);
-
-  if (!result.ok) {
-    return calendarError(result.error, result.status);
-  }
-
-  return Response.json({ data: result.data });
+export async function PATCH(request: Request, context: Context) {
+  const authorization = await authorize(); if ("error" in authorization) return authorization.error;
+  const input = sanitizeContentUpdate(await request.json());
+  if (!input) return Response.json({ error: "Güncellenecek alanları kontrol et." }, { status: 400 });
+  const result = await updateContent(authorization.userId, await identify(context), input);
+  return result.ok ? Response.json({ data: result.data }) : Response.json({ error: result.error }, { status: result.status });
 }
 
-export async function DELETE(_req: Request, context: RouteContext) {
-  const { userId } = await auth();
+export async function POST(_request: Request, context: Context) {
+  const authorization = await authorize(); if ("error" in authorization) return authorization.error;
+  const result = await duplicateContent(authorization.userId, await identify(context));
+  return result.ok ? Response.json({ data: result.data }, { status: 201 }) : Response.json({ error: result.error }, { status: result.status });
+}
 
-  if (!userId) {
-    return calendarError("Planı silmek için giriş yapmalısın.", 401);
-  }
-
-  const { id } = await context.params;
-  const result = await deleteScheduledPost(userId, id);
-
-  if (!result.ok) {
-    return calendarError(result.error, result.status);
-  }
-
-  return Response.json({ data: result.data });
+export async function DELETE(_request: Request, context: Context) {
+  const authorization = await authorize(); if ("error" in authorization) return authorization.error;
+  const result = await deleteContent(authorization.userId, await identify(context));
+  return result.ok ? Response.json({ data: result.data }) : Response.json({ error: result.error }, { status: result.status });
 }

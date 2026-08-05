@@ -5,6 +5,7 @@ import { createSignedMediaUrl, createUploadPath } from "@/lib/media/storage";
 import { mediaBucketName } from "@/lib/media/types";
 import { mediaLimitForType } from "@/lib/media/validation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { checkUsage, recordUsage } from "@/lib/billing/server";
 
 export const runtime = "nodejs";
 
@@ -231,6 +232,9 @@ export async function POST(req: Request) {
     return imageError("Görsel üretmek için giriş yapmalısın.", 401);
   }
 
+  const usageAccess = await checkUsage(userId, "ai_images");
+  if (!usageAccess.ok) return imageError(usageAccess.error, usageAccess.status);
+
   const supabase = getSupabaseServerClient();
 
   if (!supabase) {
@@ -290,6 +294,13 @@ export async function POST(req: Request) {
 
     if (!signed.ok) {
       return imageError("Görsel önizleme bağlantısı oluşturulamadı.", signed.status);
+    }
+
+    const usage = await recordUsage(userId, "ai_images", `image:${mediaId}`);
+    if (!usage.ok) {
+      await supabase.storage.from(mediaBucketName).remove([storagePath]);
+      await deleteMedia(userId, mediaId);
+      return imageError(usage.error, usage.status);
     }
 
     return Response.json({

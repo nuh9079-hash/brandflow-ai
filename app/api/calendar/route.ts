@@ -1,44 +1,21 @@
 import { auth } from "@clerk/nextjs/server";
-import { createScheduledPost, listScheduledPosts, parseCalendarFilters, sanitizeScheduledPostInput } from "@/lib/calendar/server";
+import { requireBillingFeature } from "@/lib/billing/server";
+import { createContent, listContent, sanitizeContentInput } from "@/lib/calendar/content";
 
-function calendarError(message: string, status = 400) {
-  return Response.json({ error: message }, { status });
+export async function GET(request: Request) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: "Giriş yapmalısın." }, { status: 401 });
+  const result = await listContent(userId, new URL(request.url).searchParams);
+  return result.ok ? Response.json({ data: result.data }) : Response.json({ error: result.error }, { status: result.status });
 }
 
-export async function GET(req: Request) {
+export async function POST(request: Request) {
   const { userId } = await auth();
-
-  if (!userId) {
-    return calendarError("Takvim için giriş yapmalısın.", 401);
-  }
-
-  const result = await listScheduledPosts(userId, parseCalendarFilters(new URL(req.url).searchParams));
-
-  if (!result.ok) {
-    return calendarError(result.error, result.status);
-  }
-
-  return Response.json({ data: result.data });
-}
-
-export async function POST(req: Request) {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return calendarError("Plan oluşturmak için giriş yapmalısın.", 401);
-  }
-
-  const input = sanitizeScheduledPostInput(await req.json());
-
-  if (!input) {
-    return calendarError("Plan bilgilerini kontrol et.", 400);
-  }
-
-  const result = await createScheduledPost(userId, input);
-
-  if (!result.ok) {
-    return calendarError(result.error, result.status);
-  }
-
-  return Response.json({ data: result.data });
+  if (!userId) return Response.json({ error: "Giriş yapmalısın." }, { status: 401 });
+  const access = await requireBillingFeature(userId, "calendar");
+  if (!access.ok) return Response.json({ error: access.error }, { status: access.status });
+  const input = sanitizeContentInput(await request.json());
+  if (!input) return Response.json({ error: "Plan bilgilerini kontrol et." }, { status: 400 });
+  const result = await createContent(userId, input);
+  return result.ok ? Response.json({ data: result.data }, { status: 201 }) : Response.json({ error: result.error }, { status: result.status });
 }

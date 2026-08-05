@@ -1,45 +1,17 @@
 import { auth } from "@clerk/nextjs/server";
-import { analyzeMarketingAsset, listAdvisorReports, sanitizeAdvisorInput } from "@/lib/marketing/advisor";
+import { checkUsage, recordUsage } from "@/lib/billing/server";
+import { createStrategyReport, sanitizeStrategyInput } from "@/lib/marketing/strategy";
 
-function advisorError(message: string, status = 400) {
-  return Response.json({ error: message }, { status });
-}
-
-export async function GET(req: Request) {
+export async function POST(request: Request) {
   const { userId } = await auth();
-
-  if (!userId) {
-    return advisorError("AI Marketing Advisor için giriş yapmalısın.", 401);
-  }
-
-  const limit = Number(new URL(req.url).searchParams.get("limit") || 5);
-  const result = await listAdvisorReports(userId, limit);
-
-  if (!result.ok) {
-    return advisorError(result.error, result.status);
-  }
-
-  return Response.json({ data: result.data });
-}
-
-export async function POST(req: Request) {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return advisorError("Analiz oluşturmak için giriş yapmalısın.", 401);
-  }
-
-  const input = sanitizeAdvisorInput(await req.json());
-
-  if (!input) {
-    return advisorError("Analiz için medya, platform ve içerik bilgilerini kontrol et.", 400);
-  }
-
-  const result = await analyzeMarketingAsset(userId, input);
-
-  if (!result.ok) {
-    return advisorError(result.error, result.status);
-  }
-
-  return Response.json({ data: result.data });
+  if (!userId) return Response.json({ error: "Analiz oluşturmak için giriş yapmalısın." }, { status: 401 });
+  const access = await checkUsage(userId, "advisor_analyses");
+  if (!access.ok) return Response.json({ error: access.error }, { status: access.status });
+  const input = sanitizeStrategyInput(await request.json());
+  if (!input) return Response.json({ error: "İşletme, sektör, hedef kitle, hedefler ve platformlar zorunludur." }, { status: 400 });
+  const result = await createStrategyReport(userId, input);
+  if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
+  const usage = await recordUsage(userId, "advisor_analyses", `strategy-advisor:${result.data.id}`);
+  if (!usage.ok) return Response.json({ error: usage.error }, { status: usage.status });
+  return Response.json({ data: result.data }, { status: 201 });
 }

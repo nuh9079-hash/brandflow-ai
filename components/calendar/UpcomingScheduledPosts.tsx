@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui";
-import type { ScheduledPost } from "@/lib/calendar/types";
+import type { ContentCalendarItem } from "@/lib/calendar/content-types";
 
 type CalendarResponse = {
-  data?: ScheduledPost[];
+  data?: ContentCalendarItem[];
   error?: string;
 };
 
@@ -21,7 +21,7 @@ function dateLabel(value: string | null | undefined) {
 }
 
 export function UpcomingScheduledPosts() {
-  const [posts, setPosts] = useState<ScheduledPost[]>([]);
+  const [posts, setPosts] = useState<ContentCalendarItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -77,7 +77,7 @@ export function UpcomingScheduledPosts() {
             <div key={post.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="truncate text-sm font-black text-white">{post.title}</p>
-                <span className="text-xs font-bold text-emerald-200">{post.platform}</span>
+                <span className="text-xs font-bold text-emerald-200">{post.platforms.join(", ")}</span>
               </div>
               <p className="mt-1 text-xs text-zinc-500">{dateLabel(post.scheduledAt)}</p>
             </div>

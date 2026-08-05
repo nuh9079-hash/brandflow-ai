@@ -40,6 +40,7 @@ function normalizeMedia(row: Record<string, unknown>): MediaAsset {
     duration: toNullableNumber(row.duration),
     storagePath: toNullableString(row.storage_path),
     storageUrl: toNullableString(row.storage_url),
+    isFavorite: Boolean(row.is_favorite),
     createdAt: String(row.created_at ?? ""),
     updatedAt: String(row.updated_at ?? ""),
   };
@@ -136,6 +137,7 @@ export async function updateMedia(userId: string, mediaId: string, input: Update
     ...(input.name ? { name: input.name } : {}),
     ...(input.type ? { type: input.type } : {}),
     ...("profileId" in input ? { profile_id: input.profileId || null } : {}),
+    ...("isFavorite" in input ? { is_favorite: Boolean(input.isFavorite) } : {}),
     updated_at: new Date().toISOString(),
   };
 

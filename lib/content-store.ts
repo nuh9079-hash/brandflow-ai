@@ -1,5 +1,22 @@
 ﻿import { getSupabaseServerClient } from "@/lib/supabase/server";
 
+type SupabaseErrorShape = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+};
+
+function logSupabaseError(operation: string, error: unknown) {
+  const value = error && typeof error === "object" ? error as SupabaseErrorShape : {};
+  console.error(`Supabase content store error [\${operation}]`, {
+    code: value.code ?? null,
+    message: value.message ?? String(error),
+    details: value.details ?? null,
+    hint: value.hint ?? null,
+  });
+}
+
 export type GeneratedContentRecord = {
   id: string;
   user_id: string;
@@ -32,7 +49,7 @@ export async function ensureProfile(userId: string) {
     .single();
 
   if (error) {
-    console.error("Supabase profile upsert failed", error);
+    logSupabaseError("profiles.upsert", error);
     return null;
   }
 
@@ -64,16 +81,17 @@ export async function saveGeneratedContent(input: {
     .single();
 
   if (error) {
-    console.error("Supabase generated content insert failed", error);
+    logSupabaseError("generated_contents.insert", error);
     return null;
   }
 
-  await supabase.from("history").insert({
+  const { error: historyError } = await supabase.from("history").insert({
     user_id: input.userId,
     content_id: data.id,
     action: "generated",
     metadata: { product: input.product, tone: input.tone },
   });
+  if (historyError) logSupabaseError("history.insert", historyError);
 
   return data as GeneratedContentRecord;
 }
@@ -96,7 +114,7 @@ export async function listGeneratedContents(userId: string, options?: { favorite
   const { data, error } = await query;
 
   if (error) {
-    console.error("Supabase content list failed", error);
+    logSupabaseError("generated_contents.list", error);
     return [] as GeneratedContentRecord[];
   }
 
@@ -119,12 +137,14 @@ export async function deleteGeneratedContent(userId: string, contentId: string) 
   const supabase = getSupabaseServerClient();
   if (!supabase) return { ok: true };
 
-  await supabase.from("favorites").delete().eq("user_id", userId).eq("content_id", contentId);
-  await supabase.from("history").delete().eq("user_id", userId).eq("content_id", contentId);
+  const { error: favoriteDeleteError } = await supabase.from("favorites").delete().eq("user_id", userId).eq("content_id", contentId);
+  if (favoriteDeleteError) logSupabaseError("favorites.delete_before_content", favoriteDeleteError);
+  const { error: historyDeleteError } = await supabase.from("history").delete().eq("user_id", userId).eq("content_id", contentId);
+  if (historyDeleteError) logSupabaseError("history.delete_before_content", historyDeleteError);
   const { error } = await supabase.from("generated_contents").delete().eq("user_id", userId).eq("id", contentId);
 
   if (error) {
-    console.error("Supabase delete failed", error);
+    logSupabaseError("generated_contents.delete", error);
     return { ok: false };
   }
 
@@ -142,13 +162,15 @@ export async function setFavorite(userId: string, contentId: string, favorite: b
     .eq("id", contentId);
 
   if (favorite) {
-    await supabase.from("favorites").upsert({ user_id: userId, content_id: contentId }, { onConflict: "user_id,content_id" });
+    const { error: favoriteError } = await supabase.from("favorites").upsert({ user_id: userId, content_id: contentId }, { onConflict: "user_id,content_id" });
+    if (favoriteError) logSupabaseError("favorites.upsert", favoriteError);
   } else {
-    await supabase.from("favorites").delete().eq("user_id", userId).eq("content_id", contentId);
+    const { error: favoriteError } = await supabase.from("favorites").delete().eq("user_id", userId).eq("content_id", contentId);
+    if (favoriteError) logSupabaseError("favorites.delete", favoriteError);
   }
 
   if (error) {
-    console.error("Supabase favorite failed", error);
+    logSupabaseError("generated_contents.favorite", error);
     return { ok: false };
   }
 
@@ -174,7 +196,7 @@ export async function getProfile(userId: string) {
   const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
 
   if (error) {
-    console.error("Supabase profile get failed", error);
+    logSupabaseError("profiles.get", error);
     return null;
   }
 
@@ -190,7 +212,7 @@ export async function updateProfile(userId: string, profile: Partial<ProfileSett
     .upsert({ ...profile, user_id: userId, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
 
   if (error) {
-    console.error("Supabase profile update failed", error);
+    logSupabaseError("profiles.update", error);
     return { ok: false };
   }
 

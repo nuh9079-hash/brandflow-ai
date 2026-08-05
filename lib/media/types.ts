@@ -13,6 +13,7 @@ export type MediaAsset = {
   duration?: number | null;
   storagePath?: string | null;
   storageUrl?: string | null;
+  isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -34,6 +35,7 @@ export type UpdateMediaInput = {
   name?: string;
   type?: MediaAssetType;
   profileId?: string | null;
+  isFavorite?: boolean;
 };
 
 export type MediaFilters = {

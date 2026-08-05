@@ -1,6 +1,6 @@
 import type { MediaAsset } from "@/lib/media/types";
 
-export type VideoStatus = "preparing" | "submitting" | "processing" | "completed" | "failed";
+export type VideoStatus = "preparing" | "queued" | "processing" | "completed" | "failed";
 export type VideoStyle = "Cinematic" | "Funny" | "Product Promotion" | "Social Media" | "Realistic";
 export type VideoAspectRatio = "9:16" | "1:1" | "16:9";
 
@@ -21,6 +21,68 @@ export type PolledVideoJob = {
   error?: string;
 };
 
+export class RunwayProviderError extends Error {
+  constructor(
+    message: string,
+    public readonly details: {
+      httpStatus: number;
+      responseBody: string;
+      code: string | null;
+      endpoint: string;
+      model: string | null;
+      duration: number | null;
+      ratio: string | null;
+    },
+  ) {
+    super(message);
+    this.name = "RunwayProviderError";
+  }
+}
+
+function sanitizeProviderText(value: string) {
+  return value
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [REDACTED]")
+    .replace(/("?(?:api[_-]?key|authorization|token|secret)"?\s*[:=]\s*")([^"]+)(")/gi, "$1[REDACTED]$3")
+    .replace(/(https?:\/\/[^\s"'?]+)\?[^\s"']+/gi, "$1?[REDACTED]")
+    .slice(0, 4000);
+}
+
+async function providerFailure(response: Response, context: {
+  endpoint: string;
+  model?: string;
+  duration?: number;
+  ratio?: string;
+}) {
+  const responseBody = sanitizeProviderText(await response.text());
+  let code: string | null = null;
+  let message = responseBody || `Runway isteği HTTP ${response.status} ile başarısız oldu.`;
+
+  try {
+    const parsed = JSON.parse(responseBody) as { code?: unknown; error?: unknown; message?: unknown };
+    code = typeof parsed.code === "string" ? parsed.code : null;
+    if (typeof parsed.message === "string") message = parsed.message;
+    else if (typeof parsed.error === "string") message = parsed.error;
+    else if (parsed.error && typeof parsed.error === "object" && "message" in parsed.error) {
+      const nestedError = parsed.error as { message?: unknown; code?: unknown };
+      const nestedMessage = nestedError.message;
+      if (!code && typeof nestedError.code === "string") code = nestedError.code;
+      if (typeof nestedMessage === "string") message = nestedMessage;
+    }
+  } catch {
+    // Non-JSON provider responses are returned as sanitized text.
+  }
+
+  return new RunwayProviderError(sanitizeProviderText(message), {
+    httpStatus: response.status,
+    responseBody,
+    code,
+    endpoint: context.endpoint,
+    model: context.model || null,
+    duration: context.duration ?? null,
+    ratio: context.ratio || null,
+  });
+}
+
 export const videoStyles = new Set<VideoStyle>(["Cinematic", "Funny", "Product Promotion", "Social Media", "Realistic"]);
 
 export const aspectRatios: Record<VideoAspectRatio, { providerRatio: string; width: number; height: number }> = {
@@ -29,7 +91,15 @@ export const aspectRatios: Record<VideoAspectRatio, { providerRatio: string; wid
   "16:9": { providerRatio: "1280:720", width: 1280, height: 720 },
 };
 
-const defaultRunwayDurations = [5, 10] as const;
+const defaultRunwayDurations = [5, 10, 15] as const;
+export const missingRunwayKeyMessage = "RUNWAY API anahtarı bulunamadı.";
+const runwayApiKey = process.env.RUNWAY_API_KEY?.trim() || "";
+
+export function validateRunwayConfig() {
+  return runwayApiKey
+    ? { ok: true as const, apiKey: runwayApiKey }
+    : { ok: false as const, error: missingRunwayKeyMessage };
+}
 
 function getRunwayDurations() {
   const configured = process.env.RUNWAY_VIDEO_DURATIONS;
@@ -44,17 +114,20 @@ function getRunwayDurations() {
 }
 
 export function getVideoProvider() {
-  const apiKey = process.env.RUNWAY_API_KEY;
+  const validation = validateRunwayConfig();
+  const apiKey = validation.ok ? validation.apiKey : undefined;
   const supportedDurations = getRunwayDurations();
 
   return {
     id: "runway",
     name: "Runway",
-    configured: Boolean(apiKey),
+    configured: Boolean(apiKey && apiKey.length > 0),
     apiKey,
     baseUrl: process.env.RUNWAY_API_BASE_URL || "https://api.dev.runwayml.com/v1",
     apiVersion: process.env.RUNWAY_API_VERSION || "2024-11-06",
-    model: process.env.RUNWAY_VIDEO_MODEL || "gen4_turbo",
+    textModel: process.env.RUNWAY_TEXT_VIDEO_MODEL || "seedance2_mini",
+    imageModel: process.env.RUNWAY_IMAGE_VIDEO_MODEL || "seedance2_mini",
+    videoModel: process.env.RUNWAY_VIDEO_TO_VIDEO_MODEL || "seedance2_mini",
     supportedDurations,
   };
 }
@@ -72,7 +145,7 @@ export function normalizeProviderStatus(status: unknown): VideoStatus {
 
   if (["succeeded", "success", "completed", "complete"].includes(value)) return "completed";
   if (["failed", "failure", "cancelled", "canceled"].includes(value)) return "failed";
-  if (["pending", "queued", "submitted", "starting"].includes(value)) return "submitting";
+  if (["pending", "queued", "submitted", "starting"].includes(value)) return "queued";
   return "processing";
 }
 
@@ -84,23 +157,29 @@ export async function submitVideoJob(input: {
 }): Promise<SubmittedVideoJob> {
   const provider = getVideoProvider();
   if (!provider.configured || !provider.apiKey) {
-    throw new Error("Video üretimi için gerçek sağlayıcı bağlı değil. RUNWAY_API_KEY ortam değişkenini eklemelisin.");
+    throw new Error(missingRunwayKeyMessage);
   }
 
   const ratio = aspectRatios[input.aspectRatio];
   const endpoint = input.source ? (input.source.media.type === "video" ? "video_to_video" : "image_to_video") : "text_to_video";
+  const model = input.source?.media.type === "video"
+    ? provider.videoModel
+    : input.source?.media.type === "image"
+      ? provider.imageModel
+      : provider.textModel;
   const sourcePayload =
     input.source?.media.type === "video"
-      ? { promptVideo: input.source.signedUrl }
+      ? { videoUri: input.source.signedUrl }
       : input.source?.media.type === "image"
-        ? { promptImage: input.source.signedUrl }
+        ? { promptImage: [{ uri: input.source.signedUrl, position: "first" }] }
         : {};
 
-  const response = await fetch(`${provider.baseUrl}/${endpoint}`, {
+  const requestEndpoint = `${provider.baseUrl}/${endpoint}`;
+  const response = await fetch(requestEndpoint, {
     method: "POST",
     headers: providerHeaders(provider),
     body: JSON.stringify({
-      model: provider.model,
+      model,
       promptText: input.prompt,
       ratio: ratio.providerRatio,
       duration: input.duration,
@@ -109,7 +188,12 @@ export async function submitVideoJob(input: {
   });
 
   if (!response.ok) {
-    throw new Error("Video sağlayıcısı isteği kabul etmedi. API anahtarı, model ve hesap limitlerini kontrol et.");
+    throw await providerFailure(response, {
+      endpoint: requestEndpoint,
+      model,
+      duration: input.duration,
+      ratio: ratio.providerRatio,
+    });
   }
 
   const json = (await response.json()) as { id?: string; taskId?: string; status?: string };
@@ -128,16 +212,17 @@ export async function submitVideoJob(input: {
 export async function pollVideoJob(jobId: string): Promise<PolledVideoJob> {
   const provider = getVideoProvider();
   if (!provider.configured || !provider.apiKey) {
-    throw new Error("Video üretimi için gerçek sağlayıcı bağlı değil. RUNWAY_API_KEY ortam değişkenini eklemelisin.");
+    throw new Error(missingRunwayKeyMessage);
   }
 
-  const response = await fetch(`${provider.baseUrl}/tasks/${encodeURIComponent(jobId)}`, {
+  const requestEndpoint = `${provider.baseUrl}/tasks/${encodeURIComponent(jobId)}`;
+  const response = await fetch(requestEndpoint, {
     method: "GET",
     headers: providerHeaders(provider),
   });
 
   if (!response.ok) {
-    throw new Error("Video durumu alınamadı. Sağlayıcı ayarlarını kontrol et.");
+    throw await providerFailure(response, { endpoint: requestEndpoint });
   }
 
   const json = (await response.json()) as {

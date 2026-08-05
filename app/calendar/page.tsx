@@ -11,9 +11,9 @@ export default async function CalendarPage() {
       <div className="flex min-h-screen flex-col lg:flex-row">
         <Sidebar active="Calendar" />
         <section className="flex-1 px-5 py-6 sm:px-8 lg:px-10 lg:py-8">
-          <Navbar title="Calendar">
+          <Navbar title="İçerik Takvimi">
             <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-              Medya Merkezindeki görsel ve videoları sosyal medya takvimine yerleştir, saatini düzenle ve gerçek yayın sağlayıcıları bağlandığında otomatik paylaş.
+              Medya içeriklerini bağlı sosyal hesaplar için ay veya hafta görünümünde planla.
             </p>
           </Navbar>
           <div className="pt-6">

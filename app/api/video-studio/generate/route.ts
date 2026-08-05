@@ -1,14 +1,18 @@
 ﻿import { auth } from "@clerk/nextjs/server";
 import Groq from "groq-sdk";
 import { createMedia, deleteMedia, getMedia, updateMediaStorage } from "@/lib/media/server";
-import { createSignedMediaUrl, createUploadPath } from "@/lib/media/storage";
+import { createSignedMediaUrl, createUploadPath, deleteStoredFile } from "@/lib/media/storage";
 import { mediaBucketName } from "@/lib/media/types";
 import { mediaLimitForType } from "@/lib/media/validation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { checkUsage, recordUsage } from "@/lib/billing/server";
+import { createVideoJob, getVideoJob, updateVideoJob } from "@/lib/video/jobs";
 import {
   aspectRatios,
   getVideoProvider,
+  missingRunwayKeyMessage,
   pollVideoJob,
+  RunwayProviderError,
   submitVideoJob,
   videoStyles,
   type VideoAspectRatio,
@@ -33,6 +37,31 @@ const groq = new Groq({
 
 function videoError(message: string, status = 400) {
   return Response.json({ error: message }, { status });
+}
+
+function runwayErrorResponse(error: unknown, fallbackMessage: string, context?: {
+  model?: string;
+  duration?: number;
+  ratio?: string;
+}) {
+  if (error instanceof RunwayProviderError) {
+    console.error("Runway HTTP status:", error.details.httpStatus);
+    console.error("Runway response body:", error.details.responseBody);
+    console.error("Runway error code:", error.details.code);
+    console.error("Runway error message:", error.message);
+    console.error("Runway request endpoint:", error.details.endpoint);
+    console.error("Runway selected model:", error.details.model || context?.model || null);
+    console.error("Runway submitted duration:", error.details.duration ?? context?.duration ?? null);
+    console.error("Runway submitted ratio:", error.details.ratio || context?.ratio || null);
+
+    return videoError(
+      process.env.NODE_ENV === "development" ? error.message : "Video sağlayıcısı isteği tamamlayamadı.",
+      502,
+    );
+  }
+
+  console.error("Video Studio Error:", error instanceof Error ? error.message : error);
+  return videoError(fallbackMessage, 500);
 }
 
 function safeText(value: unknown, maxLength = 1200) {
@@ -60,7 +89,7 @@ function parseSourceMediaId(value: unknown) {
 function filenameFromPrompt(prompt: string) {
   const slug = prompt
     .toLocaleLowerCase("tr-TR")
-    .replace(/[^a-z0-9ÄŸÃ¼ÅŸÃ¶Ã§Ä±Ä°ÄÃœÅÃ–Ã‡\s-]/gi, "")
+    .replace(/[^a-z0-9ğüşıöçİĞÜŞÖÇ\s-]/gi, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
@@ -104,20 +133,20 @@ async function getSourceMedia(userId: string, mediaId: string | null): Promise<V
 
   const media = await getMedia(userId, mediaId);
   if (!media.ok) {
-    throw new Error("SeÃ§ilen medya bulunamadÄ±.");
+    throw new Error("Seçilen medya bulunamadı.");
   }
 
   if (media.data.type !== "image" && media.data.type !== "video") {
-    throw new Error("Video iÃ§in yalnÄ±zca gÃ¶rsel veya video kaynak seÃ§ebilirsin.");
+    throw new Error("Video için yalnızca görsel veya video kaynak seçebilirsin.");
   }
 
   if (!media.data.storagePath) {
-    throw new Error("SeÃ§ilen medyanÄ±n dosya baÄŸlantÄ±sÄ± hazÄ±r deÄŸil.");
+    throw new Error("Seçilen medyanın dosya bağlantısı hazır değil.");
   }
 
   const signed = await createSignedMediaUrl(userId, media.data.storagePath);
   if (!signed.ok) {
-    throw new Error("SeÃ§ilen medya iÃ§in gÃ¼venli baÄŸlantÄ± oluÅŸturulamadÄ±.");
+    throw new Error("Seçilen medya için güvenli bağlantı oluşturulamadı.");
   }
 
   return {
@@ -130,20 +159,20 @@ async function downloadVideo(videoUrl: string) {
   const response = await fetch(videoUrl);
 
   if (!response.ok) {
-    throw new Error("Video dosyasÄ± indirilemedi.");
+    throw new Error("Video dosyası indirilemedi.");
   }
 
   const contentLength = Number(response.headers.get("content-length") || 0);
   const videoLimit = mediaLimitForType("video");
 
   if (contentLength > videoLimit) {
-    throw new Error("Ãœretilen video Medya Merkezi sÄ±nÄ±rÄ±nÄ± aÅŸÄ±yor.");
+    throw new Error("Üretilen video Medya Merkezi sınırını aşıyor.");
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
 
   if (buffer.byteLength > videoLimit) {
-    throw new Error("Ãœretilen video Medya Merkezi sÄ±nÄ±rÄ±nÄ± aÅŸÄ±yor.");
+    throw new Error("Üretilen video Medya Merkezi sınırını aşıyor.");
   }
 
   return {
@@ -161,7 +190,7 @@ async function saveGeneratedVideo(userId: string, input: {
   const supabase = getSupabaseServerClient();
 
   if (!supabase) {
-    throw new Error("Medya depolama yapÄ±landÄ±rÄ±lmadÄ±.");
+    throw new Error("Medya depolama yapılandırılmadı.");
   }
 
   const ratio = aspectRatios[input.aspectRatio];
@@ -181,7 +210,7 @@ async function saveGeneratedVideo(userId: string, input: {
     });
 
     if (!created.ok) {
-      throw new Error("Video medya kaydÄ± oluÅŸturulamadÄ±.");
+      throw new Error("Video medya kaydı oluşturulamadı.");
     }
 
     mediaId = created.data.id;
@@ -199,13 +228,13 @@ async function saveGeneratedVideo(userId: string, input: {
 
     if (!stored.ok) {
       await supabase.storage.from(mediaBucketName).remove([storagePath]);
-      throw new Error("Video Medya Merkezi kaydÄ± tamamlanamadÄ±.");
+      throw new Error("Video Medya Merkezi kaydı tamamlanamadı.");
     }
 
     const signed = await createSignedMediaUrl(userId, storagePath);
 
     if (!signed.ok) {
-      throw new Error("Video Ã¶nizleme baÄŸlantÄ±sÄ± oluÅŸturulamadÄ±.");
+      throw new Error("Video önizleme bağlantısı oluşturulamadı.");
     }
 
     return {
@@ -225,7 +254,7 @@ export async function GET(req: Request) {
   const { userId } = await auth();
 
   if (!userId) {
-    return videoError("Video Studio iÃ§in giriÅŸ yapmalÄ±sÄ±n.", 401);
+    return videoError("Video Studio için giriş yapmalısın.", 401);
   }
 
   const provider = getVideoProvider();
@@ -242,29 +271,43 @@ export async function GET(req: Request) {
         styles: Array.from(videoStyles),
         message: provider.configured
           ? ""
-          : "Video Ã¼retimi iÃ§in RUNWAY_API_KEY ortam deÄŸiÅŸkeni eksik. Anahtar eklenmeden gerÃ§ek video Ã¼retilemez.",
+          : missingRunwayKeyMessage,
       },
     });
   }
 
-  const prompt = safeText(url.searchParams.get("prompt"));
-  const aspectRatio = parseAspectRatio(url.searchParams.get("aspectRatio"));
-  const duration = safeInteger(url.searchParams.get("duration")) || provider.supportedDurations[0] || 5;
-
+  let pollContext: { duration?: number; ratio?: string } = {};
   try {
+    const storedJob = await getVideoJob(userId, jobId);
+    if (!storedJob.ok) return videoError(storedJob.error, storedJob.status);
+    pollContext = {
+      duration: storedJob.data.duration,
+      ratio: aspectRatios[storedJob.data.aspectRatio].providerRatio,
+    };
+
+    if (storedJob.data.status === "completed" && storedJob.data.mediaAssetId) {
+      const media = await getMedia(userId, storedJob.data.mediaAssetId);
+      if (!media.ok || !media.data.storagePath) return videoError("Tamamlanan video kaydı bulunamadı.", 404);
+      const signed = await createSignedMediaUrl(userId, media.data.storagePath);
+      if (!signed.ok) return videoError(signed.error, signed.status);
+      return Response.json({ data: { status: "completed", jobId, media: media.data, signedUrl: signed.data.signedUrl, prompt: storedJob.data.prompt } });
+    }
+
     const job = await pollVideoJob(jobId);
 
     if (job.status === "failed") {
+      await updateVideoJob(userId, jobId, { status: "failed", error: job.error || "Video üretimi başarısız oldu." });
       return Response.json({
         data: {
           status: "failed" satisfies VideoStatus,
           jobId,
-          error: job.error || "Video Ã¼retimi baÅŸarÄ±sÄ±z oldu.",
+          error: job.error || "Video üretimi başarısız oldu.",
         },
       });
     }
 
     if (job.status !== "completed") {
+      await updateVideoJob(userId, jobId, { status: job.status });
       return Response.json({
         data: {
           status: job.status,
@@ -274,15 +317,23 @@ export async function GET(req: Request) {
     }
 
     if (!job.outputUrl) {
-      return videoError("Video tamamlandÄ± ama saÄŸlayÄ±cÄ± video baÄŸlantÄ±sÄ± dÃ¶ndÃ¼rmedi.", 502);
+      return videoError("Video tamamlandı ama sağlayıcı video bağlantısı döndürmedi.", 502);
     }
 
     const saved = await saveGeneratedVideo(userId, {
       videoUrl: job.outputUrl,
-      prompt: prompt || "brandflow-video",
-      aspectRatio,
-      duration,
+      prompt: storedJob.data.prompt,
+      aspectRatio: storedJob.data.aspectRatio,
+      duration: storedJob.data.duration,
     });
+
+    const usage = await recordUsage(userId, "ai_videos", `video:${jobId}`);
+    if (!usage.ok) {
+      if (saved.media.storagePath) await deleteStoredFile(userId, saved.media.storagePath);
+      await deleteMedia(userId, saved.media.id);
+      return videoError(usage.error, usage.status);
+    }
+    await updateVideoJob(userId, jobId, { status: "completed", mediaAssetId: saved.media.id });
 
     return Response.json({
       data: {
@@ -290,11 +341,11 @@ export async function GET(req: Request) {
         jobId,
         media: saved.media,
         signedUrl: saved.signedUrl,
-        prompt,
+        prompt: storedJob.data.prompt,
       },
     });
   } catch (error) {
-    return videoError(error instanceof Error ? error.message : "Video durumu alÄ±namadÄ±.", 500);
+    return runwayErrorResponse(error, "Video durumu alınamadı.", pollContext);
   }
 }
 
@@ -302,14 +353,17 @@ export async function POST(req: Request) {
   const { userId } = await auth();
 
   if (!userId) {
-    return videoError("Video Ã¼retmek iÃ§in giriÅŸ yapmalÄ±sÄ±n.", 401);
+    return videoError("Video üretmek için giriş yapmalısın.", 401);
   }
+
+  const usageAccess = await checkUsage(userId, "ai_videos");
+  if (!usageAccess.ok) return videoError(usageAccess.error, usageAccess.status);
 
   const provider = getVideoProvider();
 
   if (!provider.configured) {
     return videoError(
-      "Video Ã¼retimi iÃ§in gerÃ§ek saÄŸlayÄ±cÄ± baÄŸlÄ± deÄŸil. RUNWAY_API_KEY ortam deÄŸiÅŸkeni eksik olduÄŸu iÃ§in video Ã¼retimi baÅŸlatÄ±lamaz.",
+      missingRunwayKeyMessage,
       503,
     );
   }
@@ -321,11 +375,11 @@ export async function POST(req: Request) {
   const style = parseStyle(body.style);
 
   if (!prompt) {
-    return videoError("Video fikrini yazmalÄ±sÄ±n.", 400);
+    return videoError("Video fikrini yazmalısın.", 400);
   }
 
   if (!provider.supportedDurations.some((supportedDuration) => supportedDuration === duration)) {
-    return videoError("SeÃ§ilen sÃ¼re bu video saÄŸlayÄ±cÄ±sÄ± tarafÄ±ndan desteklenmiyor.", 400);
+    return videoError("Seçilen süre bu video sağlayıcısı tarafından desteklenmiyor.", 400);
   }
 
   try {
@@ -337,6 +391,15 @@ export async function POST(req: Request) {
       duration,
       source,
     });
+    const stored = await createVideoJob(userId, {
+      provider: provider.name,
+      providerJobId: job.jobId,
+      status: job.status,
+      prompt: enhancedPrompt,
+      aspectRatio,
+      duration,
+    });
+    if (!stored.ok) return videoError(stored.error, 500);
 
     return Response.json({
       data: {
@@ -347,7 +410,10 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    return videoError(error instanceof Error ? error.message : "Video Ã¼retimi baÅŸlatÄ±lamadÄ±.", 500);
+    return runwayErrorResponse(error, "Video üretimi başlatılamadı.", {
+      duration,
+      ratio: aspectRatios[aspectRatio].providerRatio,
+    });
   }
 }
 
