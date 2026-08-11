@@ -1,3 +1,3 @@
-export const POST = async (request: Request) => {
-  return new Response("Webhook handler not implemented", { status: 501 });
-};
+import { handleStripeWebhook } from "../../../../lib/billing/webhook";
+
+export const POST = handleStripeWebhook;

@@ -9,6 +9,8 @@ const stateLifetimeSeconds = 10 * 60;
 type InstagramConfig = { appId: string; appSecret: string; redirectUri: string; encryptionKey: string };
 type InstagramToken = { access_token?: string; user_id?: number | string; expires_in?: number; token_type?: string; permissions?: string[] };
 type InstagramProfile = { id?: string; user_id?: string; username?: string; name?: string; account_type?: string };
+type InstagramProviderError = { message?: string; type?: string; code?: number; error_subcode?: number };
+type InstagramSignedRequestPayload = { algorithm?: string; user_id?: string | number; issued_at?: number };
 type Result<T> = { ok: true; data: T } | { ok: false; status: number; code: string; error: string };
 export type InstagramTestProfile = { id: string; username: string; accountType: string };
 
@@ -16,17 +18,93 @@ export class InstagramOAuthError extends Error {
   constructor(public readonly code: string, message: string, public readonly status = 500) { super(message); }
 }
 
+export function instagramRedirectUri() {
+  return process.env.INSTAGRAM_REDIRECT_URI?.trim() || "";
+}
+
 function configuration(): InstagramConfig {
+  const instagramAppId = process.env.INSTAGRAM_CLIENT_ID?.trim() || "";
+  const instagramAppSecret = process.env.INSTAGRAM_CLIENT_SECRET?.trim() || "";
+  const legacyAppId = process.env.META_APP_ID?.trim() || "";
+  const legacyAppSecret = process.env.META_APP_SECRET?.trim() || "";
+  const usesInstagramCredentials = Boolean(instagramAppId || instagramAppSecret);
   const values = {
-    appId: process.env.META_APP_ID?.trim() || "",
-    appSecret: process.env.META_APP_SECRET?.trim() || "",
-    redirectUri: process.env.META_REDIRECT_URI?.trim() || "",
+    appId: usesInstagramCredentials ? instagramAppId : legacyAppId,
+    appSecret: usesInstagramCredentials ? instagramAppSecret : legacyAppSecret,
+    redirectUri: instagramRedirectUri(),
     encryptionKey: process.env.SOCIAL_TOKEN_ENCRYPTION_KEY?.trim() || "",
   };
   const missing = Object.entries(values).filter(([, value]) => !value).map(([key]) => key);
   if (missing.length) throw new InstagramOAuthError("configuration_missing", `Instagram OAuth yapılandırması eksik: ${missing.join(", ")}`, 503);
   if (values.encryptionKey.length < 32) throw new InstagramOAuthError("encryption_key_invalid", "SOCIAL_TOKEN_ENCRYPTION_KEY en az 32 karakter olmalıdır.", 503);
   return values;
+}
+
+function appSecret() {
+  const value = process.env.INSTAGRAM_CLIENT_SECRET?.trim() || process.env.META_APP_SECRET?.trim() || "";
+  if (!value) throw new InstagramOAuthError("configuration_missing", "Instagram Client Secret yapılandırılmamış.", 503);
+  return value;
+}
+
+function validSignature(value: string, expected: Buffer) {
+  try {
+    const supplied = Buffer.from(value, "base64url");
+    return supplied.length === expected.length && timingSafeEqual(supplied, expected);
+  } catch {
+    return false;
+  }
+}
+
+export function parseInstagramSignedRequest(value: string) {
+  if (!value || value.length > 16_384) throw new InstagramOAuthError("signed_request_invalid", "Instagram isteği geçersiz.", 400);
+  const [encodedSignature, encodedPayload, ...rest] = value.split(".");
+  if (!encodedSignature || !encodedPayload || rest.length) throw new InstagramOAuthError("signed_request_invalid", "Instagram isteği geçersiz.", 400);
+  const expected = createHmac("sha256", appSecret()).update(encodedPayload).digest();
+  if (!validSignature(encodedSignature, expected)) throw new InstagramOAuthError("signed_request_invalid", "Instagram istek imzası doğrulanamadı.", 401);
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as InstagramSignedRequestPayload;
+    if (payload.algorithm?.toUpperCase() !== "HMAC-SHA256" || !payload.user_id) {
+      throw new InstagramOAuthError("signed_request_invalid", "Instagram istek içeriği geçersiz.", 400);
+    }
+    return { platformAccountId: String(payload.user_id), issuedAt: Number(payload.issued_at || 0) };
+  } catch (error) {
+    if (error instanceof InstagramOAuthError) throw error;
+    throw new InstagramOAuthError("signed_request_invalid", "Instagram istek içeriği okunamadı.", 400);
+  }
+}
+
+export async function deleteInstagramConnectionByPlatformAccountId(platformAccountId: string) {
+  const supabase = getSupabaseServerClient();
+  if (!supabase) throw new InstagramOAuthError("storage_unavailable", "Sosyal bağlantı veritabanı yapılandırılmamış.", 503);
+  const { data, error } = await supabase
+    .from("social_connections")
+    .delete()
+    .eq("platform", "instagram")
+    .eq("platform_account_id", platformAccountId)
+    .select("id");
+  if (error) {
+    console.error("Instagram provider data deletion failed:", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw new InstagramOAuthError("storage_failed", "Instagram bağlantı verileri silinemedi.", 500);
+  }
+  return { deleted: data?.length || 0 };
+}
+
+export function createInstagramDeletionConfirmation(platformAccountId: string) {
+  const payload = Buffer.from(JSON.stringify({ userId: platformAccountId, completedAt: Date.now() }), "utf8").toString("base64url");
+  const signature = createHmac("sha256", appSecret()).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+export function validateInstagramDeletionConfirmation(value: string) {
+  if (!value || value.length > 4096) return false;
+  const [payload, signature, ...rest] = value.split(".");
+  if (!payload || !signature || rest.length) return false;
+  return validSignature(signature, createHmac("sha256", appSecret()).update(payload).digest());
 }
 
 function encryptionKey(secret: string) { return scryptSync(secret, "brandflow-social-token-v1", 32); }
@@ -49,18 +127,24 @@ export function decryptSocialToken(value: string) {
 
 export function createInstagramState(userId: string) {
   const config = configuration(); const state = randomBytes(32).toString("base64url"); const expires = Math.floor(Date.now() / 1000) + stateLifetimeSeconds;
-  const payload = `${state}.${expires}`; const signature = createHmac("sha256", config.encryptionKey).update(`${payload}.${userId}`).digest("base64url");
+  const payload = Buffer.from(JSON.stringify({ state, expires, userId }), "utf8").toString("base64url");
+  const signature = createHmac("sha256", config.encryptionKey).update(payload).digest("base64url");
   return { state, cookieValue: `${payload}.${signature}`, maxAge: stateLifetimeSeconds };
 }
 
-export function validateInstagramState(state: string, cookieValue: string | undefined, userId: string) {
-  if (!state || !cookieValue) return false;
-  const config = configuration(); const [cookieState, expiresValue, signature] = cookieValue.split(".");
-  const expires = Number(expiresValue);
-  if (!cookieState || !signature || state !== cookieState || !Number.isFinite(expires) || expires < Math.floor(Date.now() / 1000)) return false;
-  const expected = createHmac("sha256", config.encryptionKey).update(`${cookieState}.${expires}.${userId}`).digest();
-  const supplied = Buffer.from(signature, "base64url");
-  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
+export function validateInstagramState(state: string, cookieValue: string | undefined) {
+  if (!state || !cookieValue || cookieValue.length > 4096) return null;
+  const config = configuration(); const [payload, signature, ...rest] = cookieValue.split(".");
+  if (!payload || !signature || rest.length) return null;
+  const expected = createHmac("sha256", config.encryptionKey).update(payload).digest();
+  if (!validSignature(signature, expected)) return null;
+  try {
+    const value = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { state?: string; expires?: number; userId?: string };
+    if (value.state !== state || typeof value.userId !== "string" || !value.userId || !Number.isFinite(value.expires) || Number(value.expires) < Math.floor(Date.now() / 1000)) return null;
+    return { userId: value.userId };
+  } catch {
+    return null;
+  }
 }
 
 export function instagramAuthorizationUrl(state: string) {
@@ -76,11 +160,19 @@ export function instagramAuthorizationUrl(state: string) {
   return url;
 }
 
-async function providerJson<T>(url: string, init: RequestInit, code: string): Promise<T> {
+async function providerJson<T>(url: string, init: RequestInit, code: string, stage: string): Promise<T> {
   const response = await fetch(url, { ...init, cache: "no-store" });
-  const body = await response.json().catch(() => ({})) as { error?: { message?: string; code?: number }; error_message?: string } & T;
+  const body = await response.json().catch(() => ({})) as { error?: InstagramProviderError; error_message?: string } & T;
   if (!response.ok) {
-    console.error("Instagram OAuth provider error:", { endpoint: new URL(url).origin + new URL(url).pathname, status: response.status, providerCode: body.error?.code, providerMessage: body.error?.message || body.error_message });
+    console.error("Instagram OAuth provider error:", {
+      stage,
+      endpoint: new URL(url).origin + new URL(url).pathname,
+      status: response.status,
+      providerType: body.error?.type,
+      providerCode: body.error?.code,
+      providerSubcode: body.error?.error_subcode,
+      providerMessage: safeProviderMessage(body.error?.message || body.error_message),
+    });
     throw new InstagramOAuthError(code, "Instagram bağlantısı sağlayıcı tarafından tamamlanamadı.", 502);
   }
   return body;
@@ -92,14 +184,16 @@ export async function exchangeInstagramCode(code: string) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_id: config.appId, client_secret: config.appSecret, grant_type: "authorization_code", redirect_uri: config.redirectUri, code }),
-  }, "code_exchange_failed");
+  }, "code_exchange_failed", "short_lived_token");
   if (!shortToken.access_token) throw new InstagramOAuthError("token_missing", "Instagram geçerli bir erişim anahtarı döndürmedi.", 502);
 
-  const longToken = await providerJson<InstagramToken>(`${graphEndpoint}/access_token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "ig_exchange_token", client_secret: config.appSecret, access_token: shortToken.access_token }),
-  }, "long_token_exchange_failed");
+  const longTokenUrl = new URL(`${graphEndpoint}/access_token`);
+  longTokenUrl.searchParams.set("grant_type", "ig_exchange_token");
+  longTokenUrl.searchParams.set("client_secret", config.appSecret);
+  longTokenUrl.searchParams.set("access_token", shortToken.access_token);
+  const longToken = await providerJson<InstagramToken>(longTokenUrl.toString(), {
+    method: "GET",
+  }, "long_token_exchange_failed", "long_lived_token");
   if (!longToken.access_token) throw new InstagramOAuthError("long_token_missing", "Instagram uzun süreli erişim anahtarı döndürmedi.", 502);
   return { accessToken: longToken.access_token, expiresIn: Number(longToken.expires_in || 5184000), permissions: Array.isArray(shortToken.permissions) ? shortToken.permissions : ["instagram_business_basic"] };
 }
@@ -107,7 +201,7 @@ export async function exchangeInstagramCode(code: string) {
 export async function getInstagramProfile(accessToken: string) {
   const profile = await providerJson<InstagramProfile>(`${graphEndpoint}/me?fields=id,user_id,username,name,account_type`, {
     method: "GET", headers: { Authorization: `Bearer ${accessToken}` },
-  }, "profile_read_failed");
+  }, "profile_read_failed", "profile_read");
   const accountId = profile.user_id || profile.id;
   if (!accountId || !profile.username) throw new InstagramOAuthError("profile_invalid", "Instagram profesyonel hesap bilgileri alınamadı.", 502);
   return { accountId: String(accountId), username: profile.username, name: profile.name || profile.username, accountType: profile.account_type || "PROFESSIONAL" };

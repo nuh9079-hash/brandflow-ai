@@ -322,6 +322,14 @@ export function PublishCenterClient({ initialItems, providerStatuses }: PublishC
     setMessage("");
   }
 
+  function connectAccount(status: SocialProviderStatus) {
+    if (status.platform === "instagram" && status.configured) {
+      window.location.assign("/api/connections/instagram/start");
+      return;
+    }
+    setConnectInfo(status);
+  }
+
   function prepareAll() {
     if (!selectedItem) {
       setMessage("Önce hazırlanacak bir içerik seç.");
@@ -455,16 +463,16 @@ export function PublishCenterClient({ initialItems, providerStatuses }: PublishC
                   </span>
                   <div>
                     <p className="text-sm font-bold text-white">{status.label}</p>
-                    <p className="text-xs text-zinc-500">{status.connected ? "Bağlı" : "Bağlanmadı"}</p>
+                    <p className="text-xs text-zinc-500">{status.connected ? "Bağlı" : status.configured ? "OAuth hazır" : "Bağlanmadı"}</p>
                   </div>
                 </div>
                 <span className={`rounded-full px-2 py-1 text-xs font-bold ${status.connected ? "bg-emerald-400 text-zinc-950" : "bg-white/10 text-zinc-400"}`}>
-                  {status.connected ? "Aktif" : "Pasif"}
+                  {status.connected ? "Aktif" : status.configured ? "Hazır" : "Pasif"}
                 </span>
               </div>
               <p className="mt-3 text-xs leading-5 text-zinc-500">{status.message}</p>
-              <Button type="button" variant="secondary" onClick={() => setConnectInfo(status)} className="mt-4 w-full px-3 py-2 text-xs">
-                Hesabı Bağla
+              <Button type="button" variant="secondary" onClick={() => connectAccount(status)} className="mt-4 w-full px-3 py-2 text-xs">
+                {status.platform === "instagram" && status.configured ? "Instagram ile bağlan" : "Hesabı Bağla"}
               </Button>
             </div>
           ))}

@@ -6,6 +6,9 @@ const isPublicRoute = createRouteMatcher([
   "/api/media(.*)",
   "/api/billing/webhook(.*)",
   "/api/stripe/webhook",
+  "/api/connections/instagram/deauthorize",
+  "/api/connections/instagram/data-deletion(.*)",
+  "/api/connections/instagram/callback",
 ]);
 const isProtectedRoute = createRouteMatcher([
   "/",

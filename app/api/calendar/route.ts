@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { requireBillingFeature } from "@/lib/billing/server";
-import { createContent, listContent, sanitizeContentInput } from "@/lib/calendar/content";
+import { createContent, listContent, sanitizeContentInput } fro@/m "lib/calendar/content";
 
 export async function GET(request: Request) {
   const { userId } = await auth();

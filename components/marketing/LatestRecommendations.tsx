@@ -25,7 +25,7 @@ export function LatestRecommendations() {
 
     async function loadReports() {
       try {
-        const response = await fetch("/api/marketing-advisor/analyze?limit=3");
+        const response = await fetch("/api/marketing-advisor/history?limit=3");
         const json = (await response.json()) as AdvisorResponse;
 
         if (active && response.ok && Array.isArray(json.data)) {

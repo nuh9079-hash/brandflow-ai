@@ -39,6 +39,26 @@ Open:
 http://localhost:3000
 ```
 
+### Ngrok OAuth Development
+
+Add your ngrok credentials to `.env.local` once:
+
+```env
+NGROK_AUTHTOKEN=your_ngrok_authtoken
+NGROK_DOMAIN=deafening-reptile-stopped.ngrok-free.dev
+```
+
+Start Next.js and the ngrok tunnel together:
+
+```bash
+npm run dev:tunnel
+```
+
+The command opens the tunnel first, writes its verified HTTPS URL to
+`NEXT_PUBLIC_APP_URL` and `INSTAGRAM_REDIRECT_URI`, and then starts Next.js.
+Copy the printed Instagram callback URL into Meta Developers > Instagram >
+Valid OAuth Redirect URIs. Keep this terminal running while testing OAuth.
+
 ## Environment Variables
 
 Create `.env.local` from `.env.example` and fill real values locally. Never hardcode secrets in source files.

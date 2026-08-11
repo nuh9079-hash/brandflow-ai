@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { Navbar } from "@/components/layout/Navbar";
+import { Navbar } from "../../components/layout/Navbar";
+import { Sidebar } from "../../components/layout/Sidebar";
 import { CalendarClient } from "./CalendarClient";
 
 export default async function CalendarPage() {

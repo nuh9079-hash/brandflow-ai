@@ -7,7 +7,7 @@ type ProviderConfig = {
 };
 
 function hasOAuthConfig(requiredEnv: string[]) {
-  return requiredEnv.every((key) => Boolean(process.env[key]));
+  return requiredEnv.every((key) => Boolean(process.env[key]?.trim()));
 }
 
 export function createProvider({ platform, label, requiredEnv }: ProviderConfig): SocialProvider {

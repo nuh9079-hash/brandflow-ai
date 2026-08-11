@@ -69,8 +69,19 @@ Return only valid JSON: {"executiveSummary":"","growthOpportunities":[""],"weakn
 export async function createStrategyReport(userId: string, input: StrategyInput): Promise<Result<StrategyReport>> {
   try {
     const report = await generate(input, await internalContext(userId)); const supabase = getSupabaseServerClient(); if (!supabase) return { ok: false, status: 503, error: "Advisor veritabanı yapılandırılmadı." };
-    const { data, error } = await supabase.from(tableName).insert({ clerk_user_id: userId, business_name: input.businessName, industry: input.industry, target_audience: input.targetAudience, goals: input.goals, platforms: input.platforms, website: input.website || null, report, marketing_score: report.marketingScore }).select("*").single();
-    return error ? { ok: false, status: 500, error: "Advisor raporu kaydedilemedi." } : { ok: true, data: normalizeReport(data as Row) };
+    const { data, error } = await supabase.from(tableName).insert({ clerk_user_id: userId, business_name: input.businessName, industry: input.industry, target_audience: input.targetAudience, goals: input.goals, platforms: input.platforms, website: input.website, report, marketing_score: report.marketingScore }).select("*").single();
+    if (error) {
+      console.error("Marketing Advisor report insert failed:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        table: tableName,
+        hasAuthenticatedUser: Boolean(userId),
+      });
+      return { ok: false, status: 500, error: "Advisor raporu kaydedilemedi." };
+    }
+    return { ok: true, data: normalizeReport(data as Row) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "CONFIG_PROJECT") return { ok: false, status: 503, error: "GOOGLE_CLOUD_PROJECT yapılandırılmadı." };
