@@ -7,6 +7,7 @@ import type { ScheduledPublish, ScheduledPublishInput, ScheduledPublishStatus } 
 type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 const statuses: ScheduledPublishStatus[] = ["scheduled", "processing", "published", "failed", "cancelled"];
 const columns = "id,profile_id,media_asset_id,title,caption,scheduled_at,timezone,platforms,status,metadata,last_error,published_at,created_at,updated_at,media_assets(name,type,storage_path)";
+const PROCESSING_TIMEOUT_MS = 15 * 60 * 1000;
 
 function text(value: unknown, max: number) { return typeof value === "string" ? value.trim().slice(0, max) : ""; }
 function nullable(value: unknown, max = 160) { const result = text(value, max); return result || null; }
@@ -95,6 +96,14 @@ export async function cancelScheduledPublish(userId: string, id: string): Promis
   if (error) { logError("cancel", error); return { ok: false, status: 500, error: "Plan iptal edilemedi." }; }
   if (!data) return { ok: false, status: 409, error: "İşlenen veya yayınlanan plan iptal edilemez." };
   return { ok: true, data: await normalize(userId, data as Record<string, unknown>) };
+}
+
+export async function recoverStaleScheduledPublishes(): Promise<number> {
+  const supabase = getSupabaseServerClient(); if (!supabase) return 0;
+  const staleBefore = new Date(Date.now() - PROCESSING_TIMEOUT_MS).toISOString();
+  const { data, error } = await supabase.from("content_calendar").update({ status: "scheduled", last_error: "Önceki yayınlama işlemi zaman aşımına uğradı; otomatik olarak yeniden kuyruğa alındı.", updated_at: new Date().toISOString() }).eq("status", "processing").eq("metadata->>kind", "scheduled_publish").lt("updated_at", staleBefore).select("id");
+  if (error) { logError("recover-stale", error); return 0; }
+  return data?.length || 0;
 }
 
 export async function listDueScheduledPublishIds(): Promise<string[]> {
