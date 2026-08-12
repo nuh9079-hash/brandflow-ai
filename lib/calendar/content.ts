@@ -5,7 +5,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { ContentCalendarInput, ContentCalendarItem, ContentCalendarResult, ContentCalendarStatus, ContentCalendarUpdate } from "./content-types";
 
 const tableName = "content_calendar";
-const statuses: ContentCalendarStatus[] = ["draft", "scheduled", "publishing", "published", "failed"];
+const statuses: ContentCalendarStatus[] = ["draft", "scheduled", "publishing", "processing", "published", "failed", "cancelled"];
 
 function fail<T>(status: number, error: string): ContentCalendarResult<T> { return { ok: false, status, error }; }
 function text(value: unknown, max: number) { return typeof value === "string" ? value.trim().slice(0, max) : ""; }
@@ -31,12 +31,15 @@ function normalizeMedia(value: unknown): MediaAsset | null {
 }
 
 function normalize(row: Record<string, unknown>): ContentCalendarItem {
+  const metadata = row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata) ? row.metadata as Record<string, unknown> : {};
   return {
     id: String(row.id), profileId: nullable(row.profile_id), mediaAssetId: nullable(row.media_asset_id),
     title: String(row.title || ""), caption: String(row.caption || ""), scheduledAt: String(row.scheduled_at || ""),
     timezone: String(row.timezone || "UTC"), platforms: platformList(row.platforms),
     status: isStatus(row.status) ? row.status : "draft", createdAt: String(row.created_at || ""),
-    updatedAt: String(row.updated_at || ""), media: normalizeMedia(row.media_assets),
+    updatedAt: String(row.updated_at || ""), kind: metadata.kind === "scheduled_publish" ? "scheduled_publish" : "calendar",
+    lastError: typeof row.last_error === "string" ? row.last_error : null, publishedAt: typeof row.published_at === "string" ? row.published_at : null,
+    media: normalizeMedia(row.media_assets),
   };
 }
 
@@ -105,6 +108,9 @@ export async function updateContent(userId: string, id: string, input: ContentCa
   if ("mediaAssetId" in input && !(await verifyMedia(userId, input.mediaAssetId)).ok) return fail(400, "Seçilen medya bulunamadı.");
   if (input.platforms && !(await verifyPlatforms(userId, input.platforms))) return fail(400, "Seçilen platformlardan en az biri bağlı değil.");
   const supabase = getSupabaseServerClient(); if (!supabase) return fail(503, "Takvim altyapısı yapılandırılmadı.");
+  const { data: existing, error: existingError } = await supabase.from(tableName).select("status").eq("clerk_user_id", userId).eq("id", id).maybeSingle();
+  if (existingError || !existing) return fail(404, "Plan bulunamadı.");
+  if (["publishing", "processing", "published", "cancelled"].includes(String(existing.status))) return fail(409, "İşlenen, yayınlanan veya iptal edilen plan değiştirilemez.");
   const row = { ...(input.profileId !== undefined ? { profile_id: input.profileId } : {}), ...(input.mediaAssetId !== undefined ? { media_asset_id: input.mediaAssetId } : {}), ...(input.title !== undefined ? { title: input.title } : {}), ...(input.caption !== undefined ? { caption: input.caption } : {}), ...(input.scheduledAt !== undefined ? { scheduled_at: input.scheduledAt } : {}), ...(input.timezone !== undefined ? { timezone: input.timezone } : {}), ...(input.platforms ? { platforms: input.platforms } : {}), ...(input.status ? { status: input.status } : {}) };
   const { data, error } = await supabase.from(tableName).update(row).eq("clerk_user_id", userId).eq("id", id).select("*,media_assets(*)").maybeSingle();
   if (error) return fail(500, "Plan güncellenemedi."); if (!data) return fail(404, "Plan bulunamadı."); return { ok: true, data: normalize(data as Record<string, unknown>) };
@@ -112,6 +118,14 @@ export async function updateContent(userId: string, id: string, input: ContentCa
 
 export async function deleteContent(userId: string, id: string): Promise<ContentCalendarResult<{ deleted: true }>> {
   const supabase = getSupabaseServerClient(); if (!supabase) return fail(503, "Takvim altyapısı yapılandırılmadı.");
+  const { data: existing, error: existingError } = await supabase.from(tableName).select("status,metadata").eq("clerk_user_id", userId).eq("id", id).maybeSingle();
+  if (existingError || !existing) return fail(404, "Plan bulunamadı.");
+  if (["publishing", "processing", "published", "cancelled"].includes(String(existing.status))) return fail(409, "İşlenen, yayınlanan veya iptal edilen plan silinemez.");
+  const metadata = existing.metadata && typeof existing.metadata === "object" ? existing.metadata as Record<string, unknown> : {};
+  if (metadata.kind === "scheduled_publish") {
+    const { error } = await supabase.from(tableName).update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("clerk_user_id", userId).eq("id", id).in("status", ["scheduled", "failed"]);
+    return error ? fail(500, "Plan iptal edilemedi.") : { ok: true, data: { deleted: true } };
+  }
   const { data, error } = await supabase.from(tableName).delete().eq("clerk_user_id", userId).eq("id", id).select("id").maybeSingle();
   if (error) return fail(500, "Plan silinemedi."); if (!data) return fail(404, "Plan bulunamadı."); return { ok: true, data: { deleted: true } };
 }

@@ -1,7 +1,7 @@
 import type { MediaAsset } from "@/lib/media/types";
 import type { SocialPlatform } from "@/lib/social/connections";
 
-export type ContentCalendarStatus = "draft" | "scheduled" | "publishing" | "published" | "failed";
+export type ContentCalendarStatus = "draft" | "scheduled" | "publishing" | "processing" | "published" | "failed" | "cancelled";
 
 export type ContentCalendarItem = {
   id: string;
@@ -15,6 +15,9 @@ export type ContentCalendarItem = {
   status: ContentCalendarStatus;
   createdAt: string;
   updatedAt: string;
+  kind: "calendar" | "scheduled_publish";
+  lastError: string | null;
+  publishedAt: string | null;
   media: MediaAsset | null;
 };
 

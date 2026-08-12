@@ -13,6 +13,7 @@ type InstagramProviderError = { message?: string; type?: string; code?: number; 
 type InstagramSignedRequestPayload = { algorithm?: string; user_id?: string | number; issued_at?: number };
 type Result<T> = { ok: true; data: T } | { ok: false; status: number; code: string; error: string };
 export type InstagramTestProfile = { id: string; username: string; accountType: string };
+export type ActiveInstagramConnection = { id: string; accountId: string; accessToken: string; expiresAt: string | null };
 
 export class InstagramOAuthError extends Error {
   constructor(public readonly code: string, message: string, public readonly status = 500) { super(message); }
@@ -20,6 +21,14 @@ export class InstagramOAuthError extends Error {
 
 export function instagramRedirectUri() {
   return process.env.INSTAGRAM_REDIRECT_URI?.trim() || "";
+}
+
+export function instagramPublicOrigin() {
+  const redirectUri = instagramRedirectUri();
+  if (redirectUri) return new URL(redirectUri).origin;
+  const ngrokDomain = process.env.NGROK_DOMAIN?.trim() || "";
+  if (!ngrokDomain) return "";
+  return new URL(ngrokDomain.includes("://") ? ngrokDomain : `https://${ngrokDomain}`).origin;
 }
 
 function configuration(): InstagramConfig {
@@ -202,9 +211,37 @@ export async function getInstagramProfile(accessToken: string) {
   const profile = await providerJson<InstagramProfile>(`${graphEndpoint}/me?fields=id,user_id,username,name,account_type`, {
     method: "GET", headers: { Authorization: `Bearer ${accessToken}` },
   }, "profile_read_failed", "profile_read");
-  const accountId = profile.user_id || profile.id;
+  const accountId = profile.id || profile.user_id;
   if (!accountId || !profile.username) throw new InstagramOAuthError("profile_invalid", "Instagram profesyonel hesap bilgileri alınamadı.", 502);
   return { accountId: String(accountId), username: profile.username, name: profile.name || profile.username, accountType: profile.account_type || "PROFESSIONAL" };
+}
+
+export async function updateStoredInstagramProfile(
+  userId: string,
+  connectionId: string,
+  profile: { accountId: string; username: string; name: string; accountType: string },
+) {
+  const supabase = getSupabaseServerClient();
+  if (!supabase) return;
+  const { error } = await supabase
+    .from("social_connections")
+    .update({
+      platform_account_id: profile.accountId,
+      account_name: profile.name,
+      account_username: profile.username,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", connectionId)
+    .eq("clerk_user_id", userId)
+    .eq("platform", "instagram");
+  if (error) {
+    console.error("Instagram connection profile sync failed:", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+  }
 }
 
 function safeProviderMessage(value: unknown) {
@@ -261,6 +298,77 @@ export async function testInstagramEnvironmentToken(): Promise<Result<InstagramT
     console.error("Instagram connection test request failed:", error instanceof Error ? error.message : error);
     return { ok: false, status: 502, code: "instagram_request_failed", error: "Instagram API servisine şu anda ulaşılamıyor." };
   }
+}
+
+export async function getActiveInstagramConnection(userId: string): Promise<Result<ActiveInstagramConnection>> {
+  const supabase = getSupabaseServerClient();
+  if (!supabase) return { ok: false, status: 503, code: "storage_unavailable", error: "Sosyal bağlantı veritabanı yapılandırılmamış." };
+  const { data, error } = await supabase
+    .from("social_connections")
+    .select("id,platform_account_id,access_token_encrypted,token_expires_at,status")
+    .eq("clerk_user_id", userId)
+    .eq("platform", "instagram")
+    .eq("status", "connected")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error("Instagram active connection lookup failed:", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    return { ok: false, status: 500, code: "connection_lookup_failed", error: "Instagram bağlantısı okunamadı." };
+  }
+  if (!data) return { ok: false, status: 404, code: "connection_missing", error: "Bağlı bir Instagram hesabı bulunamadı." };
+  if (typeof data.access_token_encrypted !== "string" || !data.access_token_encrypted) {
+    return { ok: false, status: 401, code: "connection_token_missing", error: "Instagram bağlantı anahtarı bulunamadı. Hesabı yeniden bağla." };
+  }
+  if (typeof data.platform_account_id !== "string" || !data.platform_account_id) {
+    return { ok: false, status: 409, code: "connection_account_missing", error: "Instagram hesap kimliği bulunamadı. Hesabı yeniden bağla." };
+  }
+  const expiresAt = typeof data.token_expires_at === "string" ? data.token_expires_at : null;
+  if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
+    return { ok: false, status: 401, code: "connection_expired", error: "Instagram bağlantısının süresi dolmuş. Hesabı yeniden bağla." };
+  }
+  try {
+    return {
+      ok: true,
+      data: {
+        id: String(data.id),
+        accountId: data.platform_account_id,
+        accessToken: decryptSocialToken(data.access_token_encrypted),
+        expiresAt,
+      },
+    };
+  } catch {
+    return { ok: false, status: 401, code: "connection_token_invalid", error: "Instagram bağlantı anahtarı okunamadı. Hesabı yeniden bağla." };
+  }
+}
+
+export async function testStoredInstagramConnection(userId: string): Promise<Result<InstagramTestProfile>> {
+  const connection = await getActiveInstagramConnection(userId);
+  if (!connection.ok) return connection;
+  try {
+    const profile = await getInstagramProfile(connection.data.accessToken);
+    await updateStoredInstagramProfile(userId, connection.data.id, profile);
+    return { ok: true, data: { id: profile.accountId, username: profile.username, accountType: profile.accountType } };
+  } catch (error) {
+    const safe = safeInstagramError(error);
+    return { ok: false, status: safe.status, code: safe.code, error: safe.message };
+  }
+}
+
+export async function markInstagramConnectionExpired(userId: string, connectionId: string, code: string) {
+  const supabase = getSupabaseServerClient();
+  if (!supabase) return;
+  await supabase
+    .from("social_connections")
+    .update({ status: "expired", last_error: code, updated_at: new Date().toISOString() })
+    .eq("id", connectionId)
+    .eq("clerk_user_id", userId)
+    .eq("platform", "instagram");
 }
 
 export async function saveInstagramConnection(userId: string, token: { accessToken: string; expiresIn: number; permissions: string[] }, profile: { accountId: string; username: string; name: string; accountType: string }): Promise<Result<{ id: string }>> {

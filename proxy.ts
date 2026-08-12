@@ -9,6 +9,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/connections/instagram/deauthorize",
   "/api/connections/instagram/data-deletion(.*)",
   "/api/connections/instagram/callback",
+  "/api/cron/scheduled-publishes",
 ]);
 const isProtectedRoute = createRouteMatcher([
   "/",

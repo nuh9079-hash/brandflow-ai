@@ -46,6 +46,34 @@ function normalizeMedia(row: Record<string, unknown>): MediaAsset {
   };
 }
 
+function viewedMediaId(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") return null;
+  return toNullableString((metadata as Record<string, unknown>).mediaId);
+}
+
+async function viewedMediaMap(userId: string) {
+  const supabase = getSupabaseServerClient();
+  if (!supabase) return { ok: false as const };
+
+  const { data, error } = await supabase
+    .from("history")
+    .select("metadata, created_at")
+    .eq("user_id", userId)
+    .eq("action", "media_viewed")
+    .order("created_at", { ascending: false })
+    .limit(1000);
+
+  if (error) return { ok: false as const };
+
+  const viewed = new Map<string, string>();
+  for (const row of data ?? []) {
+    const mediaId = viewedMediaId(row.metadata);
+    if (mediaId && !viewed.has(mediaId)) viewed.set(mediaId, String(row.created_at));
+  }
+
+  return { ok: true as const, data: viewed };
+}
+
 function toInsertRow(userId: string, input: CreateMediaInput) {
   return {
     clerk_user_id: userId,
@@ -86,9 +114,15 @@ export async function listMedia(userId: string, filters: MediaFilters = {}): Pro
 
   if (error) return serviceError();
 
+  const viewed = await viewedMediaMap(userId);
+  if (!viewed.ok) return serviceError();
+
   return {
     ok: true,
-    data: (data ?? []).map((row) => normalizeMedia(row as Record<string, unknown>)),
+    data: (data ?? []).map((row) => {
+      const media = normalizeMedia(row as Record<string, unknown>);
+      return { ...media, viewedAt: viewed.data.get(media.id) ?? null };
+    }),
   };
 }
 
@@ -106,7 +140,11 @@ export async function getMedia(userId: string, mediaId: string): Promise<MediaSe
   if (error) return serviceError();
   if (!data) return serviceError(404, "Medya bulunamadı.");
 
-  return { ok: true, data: normalizeMedia(data as Record<string, unknown>) };
+  const media = normalizeMedia(data as Record<string, unknown>);
+  const viewed = await viewedMediaMap(userId);
+  if (!viewed.ok) return serviceError();
+
+  return { ok: true, data: { ...media, viewedAt: viewed.data.get(media.id) ?? null } };
 }
 
 export async function createMedia(userId: string, input: CreateMediaInput): Promise<MediaServiceResult<MediaAsset>> {
@@ -132,6 +170,23 @@ export async function updateMedia(userId: string, mediaId: string, input: Update
 
   const supabase = getSupabaseServerClient();
   if (!supabase) return supabaseUnavailable();
+
+  if (input.viewedAt && !current.data.viewedAt) {
+    const { error: viewedError } = await supabase.from("history").insert({
+      user_id: userId,
+      content_id: null,
+      action: "media_viewed",
+      metadata: { mediaId },
+      created_at: input.viewedAt,
+    });
+
+    if (viewedError) return serviceError();
+  }
+
+  const hasMediaUpdate = Boolean(
+    input.name || input.type || "profileId" in input || "isFavorite" in input
+  );
+  if (!hasMediaUpdate) return getMedia(userId, mediaId);
 
   const updateRow = {
     ...(input.name ? { name: input.name } : {}),

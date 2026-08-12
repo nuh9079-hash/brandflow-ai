@@ -595,8 +595,27 @@ export function MediaCenterClient() {
         throw new Error(json.error || "Önizleme bağlantısı oluşturulamadı.");
       }
 
+      let previewItem = item;
+      if (!item.viewedAt) {
+        const viewedAt = new Date().toISOString();
+        const viewedResponse = await fetch(`/api/media/${item.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ viewedAt }),
+        });
+        const viewedJson = (await viewedResponse.json()) as { data?: MediaAsset; error?: string };
+
+        if (!viewedResponse.ok || !viewedJson.data) {
+          throw new Error(viewedJson.error || "Medya görüntülendi olarak işaretlenemedi.");
+        }
+
+        previewItem = viewedJson.data;
+        setItems((current) => current.map((media) => media.id === item.id ? previewItem : media));
+        setAllItems((current) => current.map((media) => media.id === item.id ? previewItem : media));
+      }
+
       setPreview({
-        item,
+        item: previewItem,
         signedUrl: json.data.signedUrl,
       });
     } catch (err) {

@@ -7,6 +7,10 @@ export type SocialProviderStatus = {
   configured: boolean;
   requiredEnv: string[];
   message: string;
+  connectionId?: string;
+  accountName?: string | null;
+  accountUsername?: string | null;
+  connectionStatus?: "disconnected" | "connecting" | "connected" | "expired" | "error";
 };
 
 export type SocialPublishPayload = {

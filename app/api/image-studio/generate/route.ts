@@ -6,6 +6,7 @@ import { mediaBucketName } from "@/lib/media/types";
 import { mediaLimitForType } from "@/lib/media/validation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { checkUsage, recordUsage } from "@/lib/billing/server";
+import { createNotification } from "@/lib/notifications/server";
 
 export const runtime = "nodejs";
 
@@ -302,6 +303,14 @@ export async function POST(req: Request) {
       await deleteMedia(userId, mediaId);
       return imageError(usage.error, usage.status);
     }
+
+    await createNotification(userId, {
+      type: "image_completed",
+      title: "Görsel üretimi tamamlandı",
+      description: `${stored.data.name} Medya Merkezine kaydedildi.`,
+      href: "/media",
+      metadata: { mediaAssetId: stored.data.id },
+    });
 
     return Response.json({
       data: {

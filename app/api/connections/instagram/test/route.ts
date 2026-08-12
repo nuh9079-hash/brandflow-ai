@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { testInstagramEnvironmentToken } from "@/lib/social/instagram";
+import { testStoredInstagramConnection } from "@/lib/social/instagram";
 
 export async function POST() {
   const { userId } = await auth();
@@ -7,7 +7,7 @@ export async function POST() {
     return Response.json({ error: "Instagram bağlantısını test etmek için giriş yapmalısın." }, { status: 401 });
   }
 
-  const result = await testInstagramEnvironmentToken();
+  const result = await testStoredInstagramConnection(userId);
   return result.ok
     ? Response.json({ data: result.data })
     : Response.json({ error: result.error, code: result.code }, { status: result.status });

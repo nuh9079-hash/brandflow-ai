@@ -6,6 +6,7 @@ import { mediaBucketName } from "@/lib/media/types";
 import { mediaLimitForType } from "@/lib/media/validation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { checkUsage, recordUsage } from "@/lib/billing/server";
+import { createNotification } from "@/lib/notifications/server";
 import { createVideoJob, getVideoJob, updateVideoJob } from "@/lib/video/jobs";
 import {
   aspectRatios,
@@ -335,6 +336,14 @@ export async function GET(req: Request) {
     }
     await updateVideoJob(userId, jobId, { status: "completed", mediaAssetId: saved.media.id });
 
+    await createNotification(userId, {
+      type: "video_completed",
+      title: "Video üretimi tamamlandı",
+      description: `${saved.media.name} Medya Merkezine kaydedildi.`,
+      href: "/media",
+      metadata: { mediaAssetId: saved.media.id, jobId },
+    });
+
     return Response.json({
       data: {
         status: "completed" satisfies VideoStatus,
@@ -416,4 +425,3 @@ export async function POST(req: Request) {
     });
   }
 }
-

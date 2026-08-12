@@ -98,7 +98,15 @@ export function validateUpdateMediaInput(value: unknown) {
     input.isFavorite = raw.isFavorite;
   }
 
-  if (!("name" in input) && !("type" in input) && !("profileId" in input) && !("isFavorite" in input)) {
+  if ("viewedAt" in raw) {
+    const viewedAt = stringValue(raw.viewedAt);
+    if (!viewedAt || Number.isNaN(Date.parse(viewedAt))) {
+      return { ok: false as const, error: "Görüntülenme zamanı geçersiz." };
+    }
+    input.viewedAt = new Date(viewedAt).toISOString();
+  }
+
+  if (!("name" in input) && !("type" in input) && !("profileId" in input) && !("isFavorite" in input) && !("viewedAt" in input)) {
     return { ok: false as const, error: "Güncellenecek alan bulunamadı." };
   }
 

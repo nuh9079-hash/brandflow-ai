@@ -14,6 +14,7 @@ export type SafeSocialConnection = {
   accountName: string | null;
   accountUsername: string | null;
   tokenExpiresAt: string | null;
+  hasAccessToken: boolean;
   status: ConnectionStatus;
   lastError: string | null;
   createdAt: string;
@@ -43,7 +44,7 @@ function logConnectionError(operation: string, error: unknown) {
   });
 }
 
-const safeColumns = "id,profile_id,platform,platform_account_id,account_name,account_username,token_expires_at,status,last_error,created_at,updated_at";
+const safeColumns = "id,profile_id,platform,platform_account_id,account_name,account_username,access_token_encrypted,token_expires_at,status,last_error,created_at,updated_at";
 
 function normalize(row: Record<string, unknown>): SafeSocialConnection {
   const platform = socialPlatforms.includes(row.platform as SocialPlatform) ? row.platform as SocialPlatform : "instagram";
@@ -58,6 +59,7 @@ function normalize(row: Record<string, unknown>): SafeSocialConnection {
     accountName: typeof row.account_name === "string" ? row.account_name : null,
     accountUsername: typeof row.account_username === "string" ? row.account_username : null,
     tokenExpiresAt: expiresAt,
+    hasAccessToken: typeof row.access_token_encrypted === "string" && row.access_token_encrypted.length > 0,
     status,
     lastError: typeof row.last_error === "string" ? row.last_error : null,
     createdAt: String(row.created_at || ""),

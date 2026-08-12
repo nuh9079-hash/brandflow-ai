@@ -56,6 +56,14 @@ export function ConnectionsClient({ instagramResult, instagramErrorCode }: { ins
   const [testingInstagram, setTestingInstagram] = useState(false);
   const [instagramTest, setInstagramTest] = useState<{ profile?: InstagramTestProfile; error?: string } | null>(null);
 
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("instagram_oauth") !== "start") return;
+    url.searchParams.delete("instagram_oauth");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    window.location.replace("/api/connections/instagram/start");
+  }, []);
+
   const loadConnections = useCallback(async () => {
     setLoading(true);
     setError("");

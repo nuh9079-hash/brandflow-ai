@@ -14,8 +14,8 @@ type MediaResponse = { data?: MediaAsset[]; error?: string };
 type ConnectionResponse = { data?: SafeSocialConnection[]; error?: string };
 
 const platformNames: Record<SocialPlatform, string> = { instagram: "Instagram", facebook: "Facebook", linkedin: "LinkedIn", x: "X", youtube: "YouTube", tiktok: "TikTok" };
-const statusNames: Record<ContentCalendarStatus, string> = { draft: "Taslak", scheduled: "Planlandı", publishing: "Yayınlanıyor", published: "Yayınlandı", failed: "Başarısız" };
-const statusStyles: Record<ContentCalendarStatus, string> = { draft: "bg-zinc-500/15 text-zinc-300", scheduled: "bg-sky-400/15 text-sky-200", publishing: "bg-amber-400/15 text-amber-200", published: "bg-emerald-400/15 text-emerald-200", failed: "bg-red-400/15 text-red-200" };
+const statusNames: Record<ContentCalendarStatus, string> = { draft: "Taslak", scheduled: "Planlandı", publishing: "Yayınlanıyor", processing: "İşleniyor", published: "Yayınlandı", failed: "Başarısız", cancelled: "İptal" };
+const statusStyles: Record<ContentCalendarStatus, string> = { draft: "bg-zinc-500/15 text-zinc-300", scheduled: "bg-sky-400/15 text-sky-200", publishing: "bg-amber-400/15 text-amber-200", processing: "bg-amber-400/15 text-amber-200", published: "bg-emerald-400/15 text-emerald-200", failed: "bg-red-400/15 text-red-200", cancelled: "bg-zinc-500/15 text-zinc-400" };
 
 function startDay(value: Date) { const date = new Date(value); date.setHours(0, 0, 0, 0); return date; }
 function addDays(value: Date, count: number) { const date = new Date(value); date.setDate(date.getDate() + count); return date; }
@@ -57,6 +57,8 @@ export function CalendarClient() {
   const [status, setStatus] = useState<"draft" | "scheduled">("scheduled");
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false);
   const [error, setError] = useState(""); const [notice, setNotice] = useState("");
+  const selectedItem = useMemo(() => items.find((item) => item.id === selectedId) || null, [items, selectedId]);
+  const selectedLocked = Boolean(selectedItem && ["publishing", "processing", "published", "cancelled"].includes(selectedItem.status));
 
   const connectedPlatforms = useMemo(() => [...new Set(connections.filter((item) => item.status === "connected").map((item) => item.platform))], [connections]);
   const visibleDays = useMemo(() => daysFor(view, cursor), [view, cursor]);
@@ -81,6 +83,7 @@ export function CalendarClient() {
   function togglePlatform(platform: SocialPlatform) { setPlatforms((current) => current.includes(platform) ? current.filter((item) => item !== platform) : [...current, platform]); }
 
   async function save() {
+    if (selectedLocked) return setError("İşlenen, yayınlanan veya iptal edilen plan değiştirilemez.");
     if (!title.trim()) return setError("Başlık yazmalısın."); if (platforms.length === 0) return setError("En az bir bağlı platform seçmelisin.");
     setSaving(true); setError(""); setNotice("");
     try {
@@ -105,7 +108,7 @@ export function CalendarClient() {
         <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-semibold">Tarih ve saat<input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-3 py-3" /></label><label className="text-sm font-semibold">Durum<select value={status} onChange={(event) => setStatus(event.target.value as "draft" | "scheduled")} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-3 py-3"><option value="scheduled">Planlandı</option><option value="draft">Taslak</option></select></label></div>
         <label className="text-sm font-semibold">Zaman dilimi<input value={timezone} onChange={(event) => setTimezone(event.target.value)} className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 py-3" /></label>
         {error && <p className="rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200">{error}</p>}{notice && <p className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">{notice}</p>}
-        <Button onClick={() => void save()} disabled={saving}>{saving ? "Kaydediliyor" : selectedId ? "Güncelle" : "Planla"}</Button>{selectedId && <div className="grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => void duplicate()} disabled={saving}>Kopyala</Button><Button variant="secondary" onClick={() => void remove()} disabled={saving}>Sil</Button></div>}
+        <Button onClick={() => void save()} disabled={saving || selectedLocked}>{saving ? "Kaydediliyor" : selectedId ? "Güncelle" : "Planla"}</Button>{selectedId && <div className="grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => void duplicate()} disabled={saving || selectedLocked}>Kopyala</Button><Button variant="secondary" onClick={() => void remove()} disabled={saving || selectedLocked}>{selectedItem?.kind === "scheduled_publish" ? "İptal Et" : "Sil"}</Button></div>}
       </div>
     </Card>
     <div className="min-w-0"><Card className="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Takvim</p><h2 className="mt-2 text-2xl font-black capitalize">{heading}</h2></div><div className="flex flex-wrap gap-2"><div className="inline-flex rounded-lg border border-white/10 p-1">{(["month", "week"] as CalendarView[]).map((option) => <button key={option} onClick={() => setView(option)} className={`rounded-md px-3 py-2 text-sm font-bold ${view === option ? "bg-white text-zinc-950" : "text-zinc-400"}`}>{option === "month" ? "Ay" : "Hafta"}</button>)}</div><select value={filter} onChange={(event) => setFilter(event.target.value as SocialPlatform | "all")} className="rounded-lg border border-white/10 bg-zinc-950 px-3 text-sm"><option value="all">Tüm platformlar</option>{connectedPlatforms.map((platform) => <option key={platform} value={platform}>{platformNames[platform]}</option>)}</select><Button variant="secondary" onClick={() => setCursor(addDays(cursor, view === "month" ? -30 : -7))}>Önceki</Button><Button variant="secondary" onClick={() => setCursor(new Date())}>Bugün</Button><Button variant="secondary" onClick={() => setCursor(addDays(cursor, view === "month" ? 30 : 7))}>Sonraki</Button></div></div></Card>

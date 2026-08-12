@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui";
-import type { MarketingAdvisorReport } from "@/lib/marketing/advisor";
+import type { StrategyReport } from "@/lib/marketing/strategy";
 
 type AdvisorResponse = {
-  data?: MarketingAdvisorReport[];
+  data?: StrategyReport[];
   error?: string;
 };
 
@@ -16,8 +16,20 @@ function scoreClass(score: number) {
   return "text-red-200";
 }
 
+function recommendationScore(report: StrategyReport) {
+  const score = Number(report.report?.marketingScore);
+  return Number.isFinite(score) ? Math.min(100, Math.max(0, Math.round(score))) : 0;
+}
+
+function recommendationSummary(report: StrategyReport) {
+  return report.report?.brandPositioning
+    || report.report?.executiveSummary
+    || report.report?.advertisingIdeas?.[0]
+    || "Bu eski rapor için öneri özeti bulunmuyor.";
+}
+
 export function LatestRecommendations() {
-  const [reports, setReports] = useState<MarketingAdvisorReport[]>([]);
+  const [reports, setReports] = useState<StrategyReport[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -64,15 +76,18 @@ export function LatestRecommendations() {
         ) : reports.length === 0 ? (
           <p className="text-sm text-zinc-500">Henüz AI önerisi yok.</p>
         ) : (
-          reports.map((report) => (
-            <div key={report.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-              <div>
-                <p className="text-sm font-black text-white">{report.platform} analizi</p>
-                <p className="mt-1 line-clamp-1 text-xs text-zinc-500">{report.analysis.suggestedCampaignObjective}</p>
+          reports.map((report) => {
+            const score = recommendationScore(report);
+            return (
+              <div key={report.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                <div>
+                  <p className="text-sm font-black text-white">{report.businessName || "İsimsiz işletme"}</p>
+                  <p className="mt-1 line-clamp-1 text-xs text-zinc-500">{recommendationSummary(report)}</p>
+                </div>
+                <span className={`text-lg font-black ${scoreClass(score)}`}>{score}</span>
               </div>
-              <span className={`text-lg font-black ${scoreClass(report.analysis.overallScore)}`}>{report.analysis.overallScore}</span>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </Card>
