@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { listDueScheduledPublishIds } from "@/lib/scheduling/server";
+import { listDueScheduledPublishIds, recoverStaleScheduledPublishes } from "@/lib/scheduling/server";
 import { processScheduledPublish } from "@/lib/scheduling/processor";
 
 export const runtime = "nodejs";
@@ -15,8 +15,9 @@ function authorized(request: Request) {
 export async function POST(request: Request) {
   if (!process.env.CRON_SECRET) return Response.json({ error: "CRON_SECRET yapılandırılmadı." }, { status: 503 });
   if (!authorized(request)) return Response.json({ error: "Yetkisiz cron isteği." }, { status: 401 });
+  const recovered = await recoverStaleScheduledPublishes();
   const ids = await listDueScheduledPublishIds();
   const results = [];
   for (const id of ids) results.push(await processScheduledPublish(id));
-  return Response.json({ data: { checked: ids.length, published: results.filter((item) => item.ok).length, failed: results.filter((item) => !item.ok).length } });
+  return Response.json({ data: { recovered, checked: ids.length, published: results.filter((item) => item.ok).length, failed: results.filter((item) => !item.ok).length } });
 }
