@@ -1,76 +1,28 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
-:root {
-  --background: #09090b;
-  --foreground: #f4f4f5;
-}
+:root { --background:#05060b; --foreground:#f4f4f5; }
+@theme inline { --color-background:var(--background); --color-foreground:var(--foreground); --font-sans:Arial,Helvetica,sans-serif; --font-mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace; }
+*{box-sizing:border-box} html{background:var(--background)}
+body{background:transparent;color:var(--foreground);font-family:Arial,Helvetica,sans-serif;min-height:100vh} button,input,select{font:inherit}
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-}
+.bf-background{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:radial-gradient(circle at 65% 25%,#111b45 0,transparent 32%),linear-gradient(145deg,#03040a 0%,#070a17 48%,#090314 100%)}
+.bf-stars{position:absolute;inset:-20%;opacity:.55;background-image:radial-gradient(#fff 0.7px,transparent .8px),radial-gradient(#8b5cf6 .7px,transparent .9px);background-size:72px 72px,113px 113px;background-position:0 0,35px 19px;animation:bfDrift 55s linear infinite}
+.bf-aurora{position:absolute;width:65vw;height:28vw;border-radius:50%;filter:blur(70px);opacity:.25;mix-blend-mode:screen;animation:bfAurora 16s ease-in-out infinite alternate}
+.bf-aurora-one{left:18%;top:-7%;background:linear-gradient(90deg,#06b6d4,#6d28d9,#c026d3);transform:rotate(-12deg)}
+.bf-aurora-two{right:-15%;bottom:5%;background:linear-gradient(90deg,#4f46e5,#9333ea,#0ea5e9);animation-delay:-7s}
+.bf-planet{position:absolute;border-radius:50%;box-shadow:inset -35px -20px 60px #02030a,0 0 65px rgba(124,58,237,.18);animation:bfFloat 18s ease-in-out infinite alternate}
+.bf-planet-one{width:22vw;height:22vw;right:-5vw;top:13vh;background:radial-gradient(circle at 35% 30%,#7784ff,#38216f 38%,#090617 72%);opacity:.38}
+.bf-planet-two{width:7vw;height:7vw;left:32vw;top:9vh;background:radial-gradient(circle at 35% 30%,#4ee4d2,#164e63 45%,#07101a 75%);opacity:.22;animation-delay:-8s}
+.bf-vignette{position:absolute;inset:0;background:radial-gradient(circle at center,transparent 35%,rgba(1,2,7,.66) 100%)}
+.bf-custom-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.48;animation:bfCustom 24s ease-in-out infinite alternate}
+.bf-background--nebula{background:radial-gradient(circle at 72% 25%,#4c1d95 0,transparent 32%),radial-gradient(circle at 30% 70%,#172554 0,transparent 38%),#03030a}
+.bf-background--midnight{background:radial-gradient(circle at 70% 30%,#0c4a6e 0,transparent 34%),linear-gradient(160deg,#020617,#080b18 60%,#020617)}
+.bf-background--minimal{background:linear-gradient(145deg,#06070b,#0b0c12)}
+.bf-background--minimal .bf-stars,.bf-background--minimal .bf-planet,.bf-background--minimal .bf-aurora{display:none}
+@keyframes bfDrift{to{transform:translate3d(7%,5%,0)}}
+@keyframes bfAurora{to{transform:translate3d(7vw,6vh,0) rotate(8deg) scale(1.15)}}
+@keyframes bfFloat{to{transform:translate3d(-2vw,3vh,0) scale(1.04)}}
+@keyframes bfCustom{to{transform:scale(1.06) translate3d(-1%,1%,0)}}
+@media(prefers-reduced-motion:reduce){.bf-stars,.bf-aurora,.bf-planet,.bf-custom-bg{animation:none}}
 
-* {
-  box-sizing: border-box;
-}
-
-html {
-  background: var(--background);
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-button,
-input,
-select {
-  font: inherit;
-}
-
-.markdown-content p + p,
-.markdown-content ul + p,
-.markdown-content ol + p,
-.markdown-content p + ul,
-.markdown-content p + ol {
-  margin-top: 0.75rem;
-}
-
-.markdown-content ul,
-.markdown-content ol {
-  margin-left: 1.1rem;
-  list-style-position: outside;
-}
-
-.markdown-content ul {
-  list-style-type: disc;
-}
-
-.markdown-content ol {
-  list-style-type: decimal;
-}
-
-.markdown-content li + li {
-  margin-top: 0.35rem;
-}
-
-.markdown-content strong {
-  color: #f8fafc;
-  font-weight: 800;
-}
-
-.markdown-content em {
-  color: #a7f3d0;
-  font-style: normal;
-}
-
-.markdown-content code {
-  border-radius: 0.375rem;
-  background: rgb(255 255 255 / 0.08);
-  padding: 0.1rem 0.3rem;
-  color: #d9f99d;
-}
+.markdown-content p+p,.markdown-content ul+p,.markdown-content ol+p,.markdown-content p+ul,.markdown-content p+ol{margin-top:.75rem}.markdown-content ul,.markdown-content ol{margin-left:1.1rem;list-style-position:outside}.markdown-content ul{list-style-type:disc}.markdown-content ol{list-style-type:decimal}.markdown-content li+li{margin-top:.35rem}.markdown-content strong{color:#f8fafc;font-weight:800}.markdown-content em{color:#a7f3d0;font-style:normal}.markdown-content code{border-radius:.375rem;background:rgb(255 255 255/.08);padding:.1rem .3rem;color:#d9f99d}
