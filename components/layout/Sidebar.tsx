@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/Card";
 import { ProfileSwitcher } from "@/components/profiles/ProfileSwitcher";
 
 const navItems=[
- {href:"/",label:"Ana Sayfa"},{href:"/create",label:"İçerik Üret"},{href:"/publish",label:"Paylaşım & Takvim"},{href:"/profiles",label:"Sosyal Hesaplar"},{href:"/analytics",label:"Analizler"},{href:"/opportunities",label:"Fırsatlar"},{href:"/company-doctor",label:"Şirket Doktoru"},{href:"/billing",label:"Hesap Akışı"},{href:"/settings",label:"Ayarlar"}
+ {href:"/",label:"Ana Sayfa"},{href:"/create",label:"İçerik Üret"},{href:"/publish",label:"Paylaşım & Takvim"},{href:"/profiles",label:"Sosyal Hesaplar"},{href:"/analytics",label:"Analizler"},{href:"/opportunities",label:"Fırsatlar"},{href:"/company-doctor",label:"Şirket Doktoru"},{href:"/cashflow",label:"Hesap Akışı"},{href:"/settings",label:"Ayarlar"},{href:"/billing",label:"Plan & Faturalandırma"}
 ];
 
 type SidebarProps={active?:string};
