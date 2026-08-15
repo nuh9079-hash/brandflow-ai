@@ -3,7 +3,10 @@ name: BrandFlow CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches:
+      - main
+      - "chatgpt/**"
+  workflow_dispatch:
 
 jobs:
   verify:
