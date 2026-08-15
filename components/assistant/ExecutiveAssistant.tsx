@@ -6,10 +6,10 @@ import { useEffect,useRef,useState } from "react";
 
 const HIDDEN_KEY="brandflow-assistant-hidden";
 type Context={mediaCount:number|null;scheduledCount:number|null;latestAdvisor:null|{platform:string;analysis?:{overallScore?:number;suggestedCampaignObjective?:string}};cashflow:null|{income:number;expense:number;net:number}};
+function initialHidden(){return typeof window!=="undefined"&&localStorage.getItem(HIDDEN_KEY)==="1"}
 
 export function ExecutiveAssistant(){
- const pathname=usePathname();const[open,setOpen]=useState(false);const[hidden,setHidden]=useState(false);const[notice,setNotice]=useState(true);const[context,setContext]=useState<Context|null>(null);const holdTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
- useEffect(()=>{setHidden(localStorage.getItem(HIDDEN_KEY)==="1")},[]);
+ const pathname=usePathname();const[open,setOpen]=useState(false);const[hidden,setHidden]=useState(initialHidden);const[notice,setNotice]=useState(true);const[context,setContext]=useState<Context|null>(null);const holdTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  useEffect(()=>{if(!open)return;let active=true;fetch("/api/assistant/context").then(r=>r.ok?r.json():null).then(j=>{if(active&&j?.data)setContext(j.data)}).catch(()=>undefined);return()=>{active=false}},[open,pathname]);
  if(pathname.startsWith("/sign-in")||pathname.startsWith("/sign-up"))return null;
  function startHold(){holdTimer.current=setTimeout(()=>{localStorage.setItem(HIDDEN_KEY,"1");setHidden(true);setOpen(false)},850)}
