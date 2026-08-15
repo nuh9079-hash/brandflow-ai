@@ -9,8 +9,7 @@ const money=new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maxim
 export default function CashFlowClient(){
  const[entries,setEntries]=useState<Entry[]>([]);const[loading,setLoading]=useState(true);const[saving,setSaving]=useState(false);const[error,setError]=useState("");
  const[form,setForm]=useState({entryType:"income" as "income"|"expense",category:"Satış",title:"",amount:"",entryDate:new Date().toISOString().slice(0,10),note:""});
- async function load(){setLoading(true);setError("");try{const r=await fetch("/api/cashflow");const j=await r.json();if(!r.ok)throw new Error(j.error||"Yüklenemedi");setEntries(j.data||[])}catch(e){setError(e instanceof Error?e.message:"Yüklenemedi")}finally{setLoading(false)}}
- useEffect(()=>{void load()},[]);
+ useEffect(()=>{let active=true;fetch("/api/cashflow").then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error||"Yüklenemedi");return j}).then(j=>{if(active)setEntries(j.data||[])}).catch(e=>{if(active)setError(e instanceof Error?e.message:"Yüklenemedi")}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[]);
  const totals=useMemo(()=>{let income=0,expense=0;for(const e of entries){if(e.entry_type==="income")income+=Number(e.amount);else expense+=Number(e.amount)}return{income,expense,net:income-expense}},[entries]);
  async function add(){if(!form.title.trim()||!form.amount)return;setSaving(true);setError("");try{const r=await fetch("/api/cashflow",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});const j=await r.json();if(!r.ok)throw new Error(j.error||"Kaydedilemedi");setEntries(c=>[j.data,...c]);setForm(c=>({...c,title:"",amount:"",note:""}))}catch(e){setError(e instanceof Error?e.message:"Kaydedilemedi")}finally{setSaving(false)}}
  async function remove(id:string){const r=await fetch(`/api/cashflow?id=${encodeURIComponent(id)}`,{method:"DELETE"});if(r.ok)setEntries(c=>c.filter(x=>x.id!==id))}
