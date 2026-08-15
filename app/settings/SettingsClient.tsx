@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect,useState } from "react";
+import { useState } from "react";
 import { Button, Card, Input } from "@/components/ui";
 import type { ProfileSettings } from "@/lib/content-store";
 
@@ -12,11 +12,11 @@ const backgrounds:Array<{id:Bg;name:string;preview:string}>=[
  {id:"midnight",name:"Gece",preview:"bg-gradient-to-br from-sky-950 via-slate-950 to-black"},
  {id:"minimal",name:"Koyu Minimal",preview:"bg-gradient-to-br from-zinc-800 to-black"},
 ];
+function initialBackground():Bg{if(typeof window==="undefined")return"aurora";const stored=localStorage.getItem("brandflow-background") as Bg|null;return stored&&["aurora","nebula","midnight","minimal","custom"].includes(stored)?stored:"aurora"}
 
 export function SettingsClient({profile}:SettingsClientProps){
  const[form,setForm]=useState({name:profile?.name??"",brand_name:profile?.brand_name??"",brand_colors:profile?.brand_colors??"",target_audience:profile?.target_audience??"",default_language:profile?.default_language??"Türkçe",writing_style:profile?.writing_style??"Profesyonel"});
- const[saved,setSaved]=useState(false);const[background,setBackground]=useState<Bg>("aurora");const[appearanceMessage,setAppearanceMessage]=useState("");
- useEffect(()=>{const stored=localStorage.getItem("brandflow-background") as Bg|null;if(stored&&["aurora","nebula","midnight","minimal","custom"].includes(stored))setBackground(stored)},[]);
+ const[saved,setSaved]=useState(false);const[background,setBackground]=useState<Bg>(initialBackground);const[appearanceMessage,setAppearanceMessage]=useState("");
  function updateField(field:keyof typeof form,value:string){setForm(c=>({...c,[field]:value}));setSaved(false)}
  function chooseBackground(value:Bg){setBackground(value);localStorage.setItem("brandflow-background",value);setAppearanceMessage("Arka plan uygulandı.");window.dispatchEvent(new Event("brandflow-background-change"))}
  function uploadBackground(event:React.ChangeEvent<HTMLInputElement>){const file=event.target.files?.[0];if(!file)return;if(file.size>1.5*1024*1024){setAppearanceMessage("Görsel en fazla 1,5 MB olabilir. Daha küçük bir görsel seç.");return}const reader=new FileReader();reader.onload=()=>{try{localStorage.setItem("brandflow-custom-background",String(reader.result));chooseBackground("custom")}catch{setAppearanceMessage("Tarayıcı bu görseli saklayamadı. Daha küçük bir görsel dene.")}};reader.onerror=()=>setAppearanceMessage("Görsel okunamadı.");reader.readAsDataURL(file)}
