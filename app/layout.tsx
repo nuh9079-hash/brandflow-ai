@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { AnimatedBackground } from "@/components/layout/AnimatedBackground";
+import { ExecutiveAssistant } from "@/components/assistant/ExecutiveAssistant";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <div className="relative z-10 flex min-h-full flex-1 flex-col">
           <ClerkProvider>{children}</ClerkProvider>
         </div>
+        <ExecutiveAssistant />
       </body>
     </html>
   );
