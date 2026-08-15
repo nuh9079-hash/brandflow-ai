@@ -19,10 +19,10 @@ body{background:transparent;color:var(--foreground);font-family:Arial,Helvetica,
 .bf-background--midnight{background:radial-gradient(circle at 70% 30%,#0c4a6e 0,transparent 34%),linear-gradient(160deg,#020617,#080b18 60%,#020617)}
 .bf-background--minimal{background:linear-gradient(145deg,#06070b,#0b0c12)}
 .bf-background--minimal .bf-stars,.bf-background--minimal .bf-planet,.bf-background--minimal .bf-aurora{display:none}
+.bg-\[\#09090b\]{background-color:rgba(3,4,10,.58)!important}.bg-\[\#111113\]{background-color:rgba(7,8,17,.76)!important}
 @keyframes bfDrift{to{transform:translate3d(7%,5%,0)}}
 @keyframes bfAurora{to{transform:translate3d(7vw,6vh,0) rotate(8deg) scale(1.15)}}
 @keyframes bfFloat{to{transform:translate3d(-2vw,3vh,0) scale(1.04)}}
 @keyframes bfCustom{to{transform:scale(1.06) translate3d(-1%,1%,0)}}
 @media(prefers-reduced-motion:reduce){.bf-stars,.bf-aurora,.bf-planet,.bf-custom-bg{animation:none}}
-
 .markdown-content p+p,.markdown-content ul+p,.markdown-content ol+p,.markdown-content p+ul,.markdown-content p+ol{margin-top:.75rem}.markdown-content ul,.markdown-content ol{margin-left:1.1rem;list-style-position:outside}.markdown-content ul{list-style-type:disc}.markdown-content ol{list-style-type:decimal}.markdown-content li+li{margin-top:.35rem}.markdown-content strong{color:#f8fafc;font-weight:800}.markdown-content em{color:#a7f3d0;font-style:normal}.markdown-content code{border-radius:.375rem;background:rgb(255 255 255/.08);padding:.1rem .3rem;color:#d9f99d}
