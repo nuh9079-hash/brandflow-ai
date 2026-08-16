@@ -3,8 +3,20 @@ import { Card } from "@/components/ui/Card";
 import { ProfileSwitcher } from "@/components/profiles/ProfileSwitcher";
 
 const navItems=[
- {href:"/",label:"Ana Sayfa"},{href:"/create",label:"İçerik Üret"},{href:"/publish",label:"Paylaşım & Takvim"},{href:"/profiles",label:"Sosyal Hesaplar"},{href:"/analytics",label:"Analizler"},{href:"/opportunities",label:"Fırsatlar"},{href:"/company-doctor",label:"Şirket Doktoru"},{href:"/cashflow",label:"Hesap Akışı"},{href:"/settings",label:"Ayarlar"},{href:"/billing",label:"Plan & Faturalandırma"}
+ {href:"/",label:"Ana Sayfa"},
+ {href:"/create",label:"İçerik Üret"},
+ {href:"/image-studio",label:"Görsel Üret",child:true},
+ {href:"/video-studio",label:"Video Üret",child:true},
+ {href:"/media",label:"Medya Merkezi",child:true},
+ {href:"/publish",label:"Paylaşım & Takvim"},
+ {href:"/profiles",label:"Sosyal Hesaplar"},
+ {href:"/analytics",label:"Analizler"},
+ {href:"/opportunities",label:"Fırsatlar"},
+ {href:"/company-doctor",label:"Şirket Doktoru"},
+ {href:"/cashflow",label:"Hesap Akışı"},
+ {href:"/settings",label:"Ayarlar"},
+ {href:"/billing",label:"Plan & Faturalandırma"}
 ];
 
 type SidebarProps={active?:string};
-export function Sidebar({active="Ana Sayfa"}:SidebarProps){return <aside className="border-b border-white/10 bg-[#070811]/80 px-4 py-4 backdrop-blur-2xl lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-6 lg:py-7"><div className="flex items-center justify-between lg:block"><Link href="/" className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700 text-sm font-black text-white shadow-lg shadow-violet-500/20">BF</div><div><p className="text-xs text-violet-300">Intelligence</p><h1 className="text-xl font-bold text-white">BrandFlow AI</h1></div></Link></div><nav className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:mt-8 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0">{navItems.map(item=><Link key={item.href} href={item.href} className={`shrink-0 rounded-xl px-3 py-2.5 text-sm font-semibold transition lg:block ${active===item.label?"bg-violet-600/25 text-white ring-1 ring-violet-400/30":"bg-white/[.03] text-zinc-400 hover:bg-white/5 hover:text-white lg:bg-transparent"}`}>{item.label}</Link>)}</nav><Card className="mt-8 hidden border-violet-400/10 bg-black/20 p-4 backdrop-blur-xl lg:block"><p className="text-xs uppercase tracking-[.18em] text-violet-300">BrandFlow</p><p className="mt-2 font-semibold text-white">Akıllı marka merkezi</p><p className="mt-1 text-xs text-zinc-400">İçerik, fırsatlar, analiz ve şirket sağlığı tek yerde.</p></Card><div className="mt-4 hidden lg:block"><ProfileSwitcher compact/></div></aside>}
+export function Sidebar({active="Ana Sayfa"}:SidebarProps){return <aside className="border-b border-white/10 bg-[#070811]/80 px-4 py-4 backdrop-blur-2xl lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-6 lg:py-7"><div className="flex items-center justify-between lg:block"><Link href="/" className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700 text-sm font-black text-white shadow-lg shadow-violet-500/20">BF</div><div><p className="text-xs text-violet-300">Intelligence</p><h1 className="text-xl font-bold text-white">BrandFlow AI</h1></div></Link></div><nav className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:mt-8 lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">{navItems.map(item=><Link key={item.href} href={item.href} className={`shrink-0 rounded-xl px-3 py-2.5 text-sm font-semibold transition lg:block ${item.child?"lg:ml-4 lg:py-2 lg:text-[13px]":""} ${active===item.label?"bg-violet-600/25 text-white ring-1 ring-violet-400/30":"bg-white/[.03] text-zinc-400 hover:bg-white/5 hover:text-white lg:bg-transparent"}`}>{item.child&&<span className="mr-2 text-violet-400">↳</span>}{item.label}</Link>)}</nav><Card className="mt-8 hidden border-violet-400/10 bg-black/20 p-4 backdrop-blur-xl lg:block"><p className="text-xs uppercase tracking-[.18em] text-violet-300">BrandFlow</p><p className="mt-2 font-semibold text-white">Akıllı marka merkezi</p><p className="mt-1 text-xs text-zinc-400">İçerik, fırsatlar, analiz ve şirket sağlığı tek yerde.</p></Card><div className="mt-4 hidden lg:block"><ProfileSwitcher compact/></div></aside>}
