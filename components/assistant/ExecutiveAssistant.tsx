@@ -9,7 +9,7 @@ type Context={mediaCount:number|null;scheduledCount:number|null;latestAdvisor:nu
 
 export function ExecutiveAssistant(){
  const pathname=usePathname();const[open,setOpen]=useState(false);const[hidden,setHidden]=useState(false);const[notice,setNotice]=useState(true);const[context,setContext]=useState<Context|null>(null);const holdTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
- useEffect(()=>{setHidden(localStorage.getItem(HIDDEN_KEY)==="1")},[]);
+ useEffect(()=>{const timer=window.setTimeout(()=>setHidden(localStorage.getItem(HIDDEN_KEY)==="1"),0);return()=>window.clearTimeout(timer)},[]);
  useEffect(()=>{if(!open)return;let active=true;fetch("/api/assistant/context").then(r=>r.ok?r.json():null).then(j=>{if(active&&j?.data)setContext(j.data)}).catch(()=>undefined);return()=>{active=false}},[open,pathname]);
  if(pathname.startsWith("/sign-in")||pathname.startsWith("/sign-up"))return null;
  function startHold(){holdTimer.current=setTimeout(()=>{localStorage.setItem(HIDDEN_KEY,"1");setHidden(true);setOpen(false)},850)}
