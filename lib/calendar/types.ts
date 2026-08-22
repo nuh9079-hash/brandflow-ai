@@ -14,8 +14,13 @@ export type ScheduledPost = {
   caption: string;
   scheduledAt?: string | null;
   timezone: string;
+  autoPublish: boolean;
+  attemptCount: number;
+  lastAttemptAt?: string | null;
+  nextAttemptAt?: string | null;
   failureReason?: string | null;
   publishedAt?: string | null;
+  externalPostId?: string | null;
   createdAt: string;
   updatedAt: string;
   media?: MediaAsset | null;
@@ -30,6 +35,7 @@ export type ScheduledPostInput = {
   caption: string;
   scheduledAt?: string | null;
   timezone: string;
+  autoPublish: boolean;
 };
 
 export type ScheduledPostUpdate = Partial<ScheduledPostInput>;
@@ -48,3 +54,4 @@ export type CalendarServiceResult<T> =
 
 export const calendarPlatforms: CalendarPlatform[] = ["instagram", "facebook", "twitter", "tiktok", "linkedin"];
 export const calendarStatuses: CalendarStatus[] = ["draft", "scheduled", "published", "failed"];
+export const automaticPublishPlatforms: CalendarPlatform[] = ["instagram", "facebook"];
