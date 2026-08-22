@@ -15,15 +15,11 @@ export type StoredSocialConnection = {
 
 function normalize(row: Record<string, unknown>): StoredSocialConnection | null {
   const encrypted = typeof row.access_token_encrypted === "string" ? row.access_token_encrypted : "";
-  const legacyPlain = typeof row.access_token === "string" ? row.access_token : "";
-  let accessToken = legacyPlain;
-  if (encrypted) {
-    try { accessToken = decryptSocialToken(encrypted); }
-    catch { return null; }
-  }
-  const accountId = typeof row.platform_account_id === "string" && row.platform_account_id
-    ? row.platform_account_id
-    : typeof row.external_account_id === "string" ? row.external_account_id : "";
+  if (!encrypted) return null;
+  let accessToken = "";
+  try { accessToken = decryptSocialToken(encrypted); }
+  catch { return null; }
+  const accountId = typeof row.platform_account_id === "string" ? row.platform_account_id : "";
   if (!accessToken || !accountId) return null;
   return {
     id: String(row.id),
@@ -67,15 +63,12 @@ export async function upsertSocialConnection(input: {
 }) {
   const supabase = getSupabaseAdminClient();
   if (!supabase) throw new Error("Supabase service-role bağlantısı eksik.");
-  const encrypted = encryptSocialToken(input.accessToken);
   const record = {
     clerk_user_id: input.userId,
     platform: input.platform,
     platform_account_id: input.externalAccountId,
-    external_account_id: input.externalAccountId,
     account_name: input.accountName || null,
-    access_token_encrypted: encrypted,
-    access_token: null,
+    access_token_encrypted: encryptSocialToken(input.accessToken),
     token_expires_at: input.tokenExpiresAt || null,
     status: "connected",
     metadata: input.metadata || {},
@@ -95,7 +88,7 @@ export async function deleteSocialConnection(userId: string, platform: SocialPla
   if (!supabase) return false;
   const { error } = await supabase.from("social_connections").update({
     access_token_encrypted: null,
-    access_token: null,
+    refresh_token_encrypted: null,
     token_expires_at: null,
     status: "disconnected",
     last_error: null,
