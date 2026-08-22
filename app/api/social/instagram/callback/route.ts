@@ -16,7 +16,10 @@ export async function GET(request: Request) {
   if (!code || !state || !expected || state !== expected) return NextResponse.redirect(new URL("/profiles?instagram=state-error", base));
   try {
     const account = await exchangeInstagramCode(code);
-    await upsertSocialConnection({ userId, platform: "instagram", externalAccountId: account.instagramAccountId, accountName: account.accountName, accessToken: account.accessToken, tokenExpiresAt: account.tokenExpiresAt, metadata: { pageId: account.pageId } });
+    await Promise.all([
+      upsertSocialConnection({ userId, platform: "instagram", externalAccountId: account.instagramAccountId, accountName: account.accountName, accessToken: account.accessToken, tokenExpiresAt: account.tokenExpiresAt, metadata: { pageId: account.pageId } }),
+      upsertSocialConnection({ userId, platform: "facebook", externalAccountId: account.pageId, accountName: account.accountName, accessToken: account.accessToken, tokenExpiresAt: account.tokenExpiresAt, metadata: { instagramAccountId: account.instagramAccountId } }),
+    ]);
     return NextResponse.redirect(new URL("/profiles?instagram=connected", base));
   } catch (error) {
     console.error("instagram oauth callback", error);
