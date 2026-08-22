@@ -10,6 +10,7 @@ type AiResult={caption:string;hook:string;cta:string;hashtags:string[];bestTime:
 type AiPack={data:AiResult;source:"ai"|"fallback"};
 
 const DRAFT_KEY="brandflow-create-draft-v2";
+const CALENDAR_PREFILL_KEY="brandflow-calendar-prefill-v1";
 const modes:Array<{id:MediaMode;title:string;desc:string;icon:string}>=[
  {id:"image",title:"Görsel paylaşımı",desc:"Görsel oluştur, düzenle veya kendi görselini kullan.",icon:"▧"},
  {id:"video",title:"Video / Reels",desc:"Reels, TikTok veya Shorts için video hazırla.",icon:"▶"},
@@ -23,6 +24,7 @@ const improveStyles:Array<{id:ImproveStyle;label:string}>=[
 ];
 
 function platformRatio(platform:Platform){return platform==="Reels"||platform==="TikTok"||platform==="YouTube Shorts"?"aspect-[9/16] max-h-[680px]":platform==="Instagram"?"aspect-[4/5]":"aspect-[4/3]"}
+function calendarPlatform(platform:Platform){if(platform==="Instagram"||platform==="Reels")return "instagram";if(platform==="TikTok")return "tiktok";if(platform==="YouTube Shorts")return "youtube";if(platform==="Facebook")return "facebook";return "linkedin"}
 
 export function ContentCreationFlow(){
  const[mode,setMode]=useState<MediaMode>("image");
@@ -55,6 +57,7 @@ export function ContentCreationFlow(){
  function changeBrief(value:string){setBrief(value);resetAi()}
  function handleFile(file?:File){if(!file)return;if(fileUrl)URL.revokeObjectURL(fileUrl);setFileName(file.name);setFileType(file.type.startsWith("video/")?"video":"image");setFileUrl(URL.createObjectURL(file));resetAi()}
  function removeFile(){if(fileUrl)URL.revokeObjectURL(fileUrl);setFileUrl("");setFileName("");setFileType(null);resetAi()}
+ function openCalendar(){if(!ai)return;const caption=[ai.caption,ai.hashtags.join(" ")].filter(Boolean).join("\n\n");localStorage.setItem(CALENDAR_PREFILL_KEY,JSON.stringify({title:(brief.trim()||`${platform} paylaşımı`).slice(0,100),caption,platform:calendarPlatform(platform),bestTime:ai.bestTime,timingReason:ai.timingReason,referenceFileName:fileName||null}));window.location.href="/calendar"}
 
  async function generateAi(style=improveStyle){
   if(!brief.trim()){setError("Bana önce ne yapmak istediğini bir iki cümleyle anlat.");return}
@@ -114,8 +117,8 @@ export function ContentCreationFlow(){
     <div className="p-4"><p className="text-sm leading-6 text-zinc-200"><b>markan</b> {previewCaption}</p>{ai&&ai.hashtags.length>0&&<p className="mt-2 text-xs leading-5 text-violet-300">{ai.hashtags.join(" ")}</p>}<p className="mt-3 text-xs text-zinc-500">♡ Beğen &nbsp; ◯ Yorum &nbsp; ↗ Paylaş</p></div>
    </div>
 
-   <div className="mx-auto mt-5 grid max-w-[620px] gap-3 sm:grid-cols-2"><Link href="/publish" className={`rounded-2xl px-5 py-3.5 text-center text-sm font-black ${ai?"bg-white text-black":"pointer-events-none bg-white/10 text-zinc-600"}`}>Planla / Paylaş</Link><Link href={mode==="video"?"/video-studio":"/image-studio"} className={`rounded-2xl border border-white/10 bg-white/[.04] px-5 py-3.5 text-center text-sm font-black text-white ${mode==="text"?"pointer-events-none opacity-40":""}`}>{mode==="edit"?"Dosyayı ileri düzenle":mode==="video"?"Videoyu ileri düzenle":"Görseli ileri düzenle"}</Link></div>
-   <p className="mt-3 text-center text-[11px] text-zinc-600">Ana akıştan çıkmadan içerik metnini hazırlayabilir ve önizleyebilirsin. İleri düzenleme yalnızca gerektiğinde kullanılır.</p>
+   <div className="mx-auto mt-5 grid max-w-[620px] gap-3 sm:grid-cols-2"><button type="button" onClick={openCalendar} disabled={!ai} className={`rounded-2xl px-5 py-3.5 text-center text-sm font-black ${ai?"bg-white text-black":"cursor-not-allowed bg-white/10 text-zinc-600"}`}>Planla / Paylaş</button><Link href={mode==="video"?"/video-studio":"/image-studio"} className={`rounded-2xl border border-white/10 bg-white/[.04] px-5 py-3.5 text-center text-sm font-black text-white ${mode==="text"?"pointer-events-none opacity-40":""}`}>{mode==="edit"?"Dosyayı ileri düzenle":mode==="video"?"Videoyu ileri düzenle":"Görseli ileri düzenle"}</Link></div>
+   <p className="mt-3 text-center text-[11px] text-zinc-600">Planla / Paylaş dediğinde metin, platform ve AI zaman önerisi takvime otomatik taşınır. İleri düzenleme yalnızca gerektiğinde kullanılır.</p>
   </section>
  </div>
 }
