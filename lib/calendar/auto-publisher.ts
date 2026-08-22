@@ -23,6 +23,7 @@ export async function processDueScheduledPosts(): Promise<AutoPublishSummary> {
     .from("scheduled_posts")
     .select("id,clerk_user_id,attempt_count")
     .eq("status", "scheduled")
+    .eq("auto_publish", true)
     .not("scheduled_at", "is", null)
     .lte("scheduled_at", now)
     .or(`next_attempt_at.is.null,next_attempt_at.lte.${now}`)
@@ -38,6 +39,7 @@ export async function processDueScheduledPosts(): Promise<AutoPublishSummary> {
       .update({ processing_started_at: now, last_attempt_at: now, attempt_count: attempt })
       .eq("id", row.id)
       .eq("status", "scheduled")
+      .eq("auto_publish", true)
       .or(`processing_started_at.is.null,processing_started_at.lt.${stale}`)
       .select("id")
       .maybeSingle();
@@ -45,9 +47,11 @@ export async function processDueScheduledPosts(): Promise<AutoPublishSummary> {
     summary.claimed += 1;
 
     const post = await getScheduledPost(String(row.clerk_user_id), String(row.id));
-    if (!post.ok) {
-      await supabase.from("scheduled_posts").update({ processing_started_at: null, failure_reason: post.error, status: attempt >= MAX_ATTEMPTS ? "failed" : "scheduled", next_attempt_at: attempt >= MAX_ATTEMPTS ? null : nextRetry(attempt) }).eq("id", row.id);
-      if (attempt >= MAX_ATTEMPTS) summary.failed += 1;
+    if (!post.ok || !post.data.autoPublish) {
+      const reason = post.ok ? "Otomatik yayın kapatıldığı için işlem atlandı." : post.error;
+      await supabase.from("scheduled_posts").update({ processing_started_at: null, failure_reason: reason, status: post.ok ? "scheduled" : attempt >= MAX_ATTEMPTS ? "failed" : "scheduled", next_attempt_at: post.ok || attempt >= MAX_ATTEMPTS ? null : nextRetry(attempt) }).eq("id", row.id);
+      if (post.ok) summary.skipped += 1;
+      else if (attempt >= MAX_ATTEMPTS) summary.failed += 1;
       else summary.retrying += 1;
       continue;
     }
