@@ -1,7 +1,9 @@
 import { getMedia } from "@/lib/media/server";
 import type { MediaAsset } from "@/lib/media/types";
+import { getSocialConnection } from "@/lib/social/connections";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import {
+  automaticPublishPlatforms,
   calendarPlatforms,
   calendarStatuses,
   type CalendarFilters,
@@ -69,8 +71,13 @@ function normalizePost(row: Record<string, unknown>): ScheduledPost {
     caption: String(row.caption ?? ""),
     scheduledAt: nullableString(row.scheduled_at),
     timezone: String(row.timezone ?? "UTC"),
+    autoPublish: row.auto_publish === true,
+    attemptCount: Number(row.attempt_count ?? 0),
+    lastAttemptAt: nullableString(row.last_attempt_at),
+    nextAttemptAt: nullableString(row.next_attempt_at),
     failureReason: nullableString(row.failure_reason),
     publishedAt: nullableString(row.published_at),
+    externalPostId: nullableString(row.external_post_id),
     createdAt: String(row.created_at ?? ""),
     updatedAt: String(row.updated_at ?? ""),
     media: normalizeMedia(row.media_assets),
@@ -88,10 +95,17 @@ function toRow(userId: string, input: ScheduledPostInput) {
     caption: input.caption,
     scheduled_at: input.scheduledAt || null,
     timezone: input.timezone,
+    auto_publish: input.autoPublish,
+    attempt_count: 0,
+    last_attempt_at: null,
+    next_attempt_at: null,
+    processing_started_at: null,
+    failure_reason: null,
   };
 }
 
 function toUpdateRow(input: ScheduledPostUpdate) {
+  const schedulingChanged = "scheduledAt" in input || "platform" in input || "mediaAssetId" in input || "autoPublish" in input;
   return {
     ...("profileId" in input ? { profile_id: input.profileId || null } : {}),
     ...("mediaAssetId" in input ? { media_asset_id: input.mediaAssetId || null } : {}),
@@ -101,6 +115,8 @@ function toUpdateRow(input: ScheduledPostUpdate) {
     ...(input.caption !== undefined ? { caption: input.caption } : {}),
     ...("scheduledAt" in input ? { scheduled_at: input.scheduledAt || null } : {}),
     ...(input.timezone ? { timezone: input.timezone } : {}),
+    ...("autoPublish" in input ? { auto_publish: Boolean(input.autoPublish) } : {}),
+    ...(schedulingChanged ? { attempt_count: 0, last_attempt_at: null, next_attempt_at: null, processing_started_at: null, failure_reason: null } : {}),
     updated_at: new Date().toISOString(),
   };
 }
@@ -112,9 +128,11 @@ export function sanitizeScheduledPostInput(body: unknown): ScheduledPostInput | 
   const title = typeof input.title === "string" ? input.title.trim().slice(0, 140) : "";
   const caption = typeof input.caption === "string" ? input.caption.trim().slice(0, 4000) : "";
   const timezone = typeof input.timezone === "string" && input.timezone.trim() ? input.timezone.trim().slice(0, 80) : "UTC";
+  const autoPublish = input.autoPublish === true;
 
   if (!isPlatform(platform) || !isStatus(status) || !title) return null;
   if ((status === "scheduled" || status === "published") && !nullableString(input.scheduledAt)) return null;
+  if (autoPublish && status !== "scheduled") return null;
 
   return {
     profileId: nullableString(input.profileId),
@@ -125,6 +143,7 @@ export function sanitizeScheduledPostInput(body: unknown): ScheduledPostInput | 
     caption,
     scheduledAt: nullableString(input.scheduledAt),
     timezone,
+    autoPublish,
   };
 }
 
@@ -146,9 +165,11 @@ export function sanitizeScheduledPostUpdate(body: unknown): ScheduledPostUpdate 
   if ("caption" in input) update.caption = typeof input.caption === "string" ? input.caption.trim().slice(0, 4000) : "";
   if ("scheduledAt" in input) update.scheduledAt = nullableString(input.scheduledAt);
   if ("timezone" in input) update.timezone = typeof input.timezone === "string" && input.timezone.trim() ? input.timezone.trim().slice(0, 80) : "UTC";
+  if ("autoPublish" in input) update.autoPublish = input.autoPublish === true;
 
   if (Object.keys(update).length === 0) return null;
   if (update.status === "scheduled" && "scheduledAt" in update && !update.scheduledAt) return null;
+  if (update.autoPublish === true && update.status && update.status !== "scheduled") return null;
 
   return update;
 }
@@ -177,6 +198,35 @@ async function verifyMedia(userId: string, mediaAssetId?: string | null) {
   }
 
   return media;
+}
+
+async function verifyAutomaticPublishing(userId: string, input: ScheduledPostInput | (ScheduledPostUpdate & { platform?: CalendarPlatform; status?: CalendarStatus }), current?: ScheduledPost) {
+  const autoPublish = "autoPublish" in input ? input.autoPublish : current?.autoPublish;
+  if (!autoPublish) return null;
+
+  const platform = input.platform || current?.platform;
+  const status = input.status || current?.status;
+  const mediaAssetId = "mediaAssetId" in input ? input.mediaAssetId : current?.mediaAssetId;
+  const caption = input.caption !== undefined ? input.caption : current?.caption || "";
+
+  if (!platform || !automaticPublishPlatforms.includes(platform)) {
+    return calendarError(400, "Bu platformda otomatik yayın henüz etkin değil. İstersen takvime manuel hatırlatma olarak kaydedebilirsin.");
+  }
+  if (status !== "scheduled") {
+    return calendarError(400, "Otomatik yayın yalnızca planlanmış gönderilerde kullanılabilir.");
+  }
+  if (platform === "instagram" && !mediaAssetId) {
+    return calendarError(400, "Instagram otomatik yayını için bir görsel veya video seçmelisin.");
+  }
+  if (platform === "facebook" && !mediaAssetId && !caption.trim()) {
+    return calendarError(400, "Facebook otomatik yayını için metin veya medya eklemelisin.");
+  }
+
+  const connection = await getSocialConnection(userId, platform);
+  if (!connection) {
+    return calendarError(409, `${platform === "instagram" ? "Instagram" : "Facebook"} hesabı otomatik yayın için bağlı değil. Önce Sosyal Hesaplar bölümünden hesabını bağla.`);
+  }
+  return null;
 }
 
 export async function listScheduledPosts(userId: string, filters: CalendarFilters = {}): Promise<CalendarServiceResult<ScheduledPost[]>> {
@@ -222,6 +272,8 @@ export async function getScheduledPost(userId: string, id: string): Promise<Cale
 export async function createScheduledPost(userId: string, input: ScheduledPostInput): Promise<CalendarServiceResult<ScheduledPost>> {
   const media = await verifyMedia(userId, input.mediaAssetId);
   if (media && !media.ok) return media;
+  const autoCheck = await verifyAutomaticPublishing(userId, input);
+  if (autoCheck) return autoCheck;
 
   const supabase = getSupabaseServerClient();
   if (!supabase) return supabaseUnavailable();
@@ -238,6 +290,11 @@ export async function updateScheduledPost(userId: string, id: string, input: Sch
     const media = await verifyMedia(userId, input.mediaAssetId);
     if (media && !media.ok) return media;
   }
+
+  const current = await getScheduledPost(userId, id);
+  if (!current.ok) return current;
+  const autoCheck = await verifyAutomaticPublishing(userId, input, current.data);
+  if (autoCheck) return autoCheck;
 
   const supabase = getSupabaseServerClient();
   if (!supabase) return supabaseUnavailable();
