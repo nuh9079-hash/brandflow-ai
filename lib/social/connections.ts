@@ -8,6 +8,7 @@ export type StoredSocialConnection = {
   platform: SocialPlatform;
   externalAccountId: string;
   accountName: string | null;
+  accountUsername: string | null;
   accessToken: string;
   tokenExpiresAt: string | null;
   metadata: Record<string, unknown>;
@@ -27,6 +28,7 @@ function normalize(row: Record<string, unknown>): StoredSocialConnection | null 
     platform: row.platform as SocialPlatform,
     externalAccountId: accountId,
     accountName: typeof row.account_name === "string" ? row.account_name : null,
+    accountUsername: typeof row.account_username === "string" ? row.account_username : null,
     accessToken,
     tokenExpiresAt: typeof row.token_expires_at === "string" ? row.token_expires_at : null,
     metadata: row.metadata && typeof row.metadata === "object" ? row.metadata as Record<string, unknown> : {},
@@ -57,17 +59,39 @@ export async function upsertSocialConnection(input: {
   platform: SocialPlatform;
   externalAccountId: string;
   accountName?: string | null;
+  accountUsername?: string | null;
   accessToken: string;
   tokenExpiresAt?: string | null;
   metadata?: Record<string, unknown>;
 }) {
   const supabase = getSupabaseAdminClient();
   if (!supabase) throw new Error("Supabase service-role bağlantısı eksik.");
+
+  // BrandFlow currently uses one active account per platform. When a user connects
+  // another Instagram account, keep the old record for history but remove its token
+  // and make the newly connected account active.
+  const { error: deactivateError } = await supabase
+    .from("social_connections")
+    .update({
+      access_token_encrypted: null,
+      refresh_token_encrypted: null,
+      token_expires_at: null,
+      status: "disconnected",
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("clerk_user_id", input.userId)
+    .eq("platform", input.platform)
+    .neq("platform_account_id", input.externalAccountId)
+    .eq("status", "connected");
+  if (deactivateError) throw new Error("Eski sosyal hesap bağlantısı güvenli biçimde kapatılamadı.");
+
   const record = {
     clerk_user_id: input.userId,
     platform: input.platform,
     platform_account_id: input.externalAccountId,
     account_name: input.accountName || null,
+    account_username: input.accountUsername || null,
     access_token_encrypted: encryptSocialToken(input.accessToken),
     token_expires_at: input.tokenExpiresAt || null,
     status: "connected",
@@ -75,7 +99,7 @@ export async function upsertSocialConnection(input: {
     last_error: null,
     updated_at: new Date().toISOString(),
   };
-  const { data: existing } = await supabase
+  const { data: existing, error: lookupError } = await supabase
     .from("social_connections")
     .select("id")
     .eq("clerk_user_id", input.userId)
@@ -83,6 +107,7 @@ export async function upsertSocialConnection(input: {
     .eq("platform_account_id", input.externalAccountId)
     .limit(1)
     .maybeSingle();
+  if (lookupError) throw new Error("Sosyal hesap bağlantısı kontrol edilemedi.");
   const query = existing?.id
     ? supabase.from("social_connections").update(record).eq("id", existing.id)
     : supabase.from("social_connections").insert(record);
@@ -100,6 +125,6 @@ export async function deleteSocialConnection(userId: string, platform: SocialPla
     status: "disconnected",
     last_error: null,
     updated_at: new Date().toISOString(),
-  }).eq("clerk_user_id", userId).eq("platform", platform);
+  }).eq("clerk_user_id", userId).eq("platform", platform).eq("status", "connected");
   return !error;
 }
