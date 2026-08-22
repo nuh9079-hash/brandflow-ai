@@ -75,7 +75,14 @@ export async function upsertSocialConnection(input: {
     last_error: null,
     updated_at: new Date().toISOString(),
   };
-  const { data: existing } = await supabase.from("social_connections").select("id").eq("clerk_user_id", input.userId).eq("platform", input.platform).maybeSingle();
+  const { data: existing } = await supabase
+    .from("social_connections")
+    .select("id")
+    .eq("clerk_user_id", input.userId)
+    .eq("platform", input.platform)
+    .eq("platform_account_id", input.externalAccountId)
+    .limit(1)
+    .maybeSingle();
   const query = existing?.id
     ? supabase.from("social_connections").update(record).eq("id", existing.id)
     : supabase.from("social_connections").insert(record);
