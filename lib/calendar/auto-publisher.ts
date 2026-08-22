@@ -47,7 +47,8 @@ export async function processDueScheduledPosts(): Promise<AutoPublishSummary> {
     const post = await getScheduledPost(String(row.clerk_user_id), String(row.id));
     if (!post.ok) {
       await supabase.from("scheduled_posts").update({ processing_started_at: null, failure_reason: post.error, status: attempt >= MAX_ATTEMPTS ? "failed" : "scheduled", next_attempt_at: attempt >= MAX_ATTEMPTS ? null : nextRetry(attempt) }).eq("id", row.id);
-      attempt >= MAX_ATTEMPTS ? summary.failed += 1 : summary.retrying += 1;
+      if (attempt >= MAX_ATTEMPTS) summary.failed += 1;
+      else summary.retrying += 1;
       continue;
     }
 
@@ -58,7 +59,8 @@ export async function processDueScheduledPosts(): Promise<AutoPublishSummary> {
     } else {
       const finalFailure = attempt >= MAX_ATTEMPTS;
       await supabase.from("scheduled_posts").update({ status: finalFailure ? "failed" : "scheduled", processing_started_at: null, next_attempt_at: finalFailure ? null : nextRetry(attempt), failure_reason: result.error }).eq("id", row.id);
-      finalFailure ? summary.failed += 1 : summary.retrying += 1;
+      if (finalFailure) summary.failed += 1;
+      else summary.retrying += 1;
     }
   }
   return summary;
