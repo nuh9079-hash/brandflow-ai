@@ -68,7 +68,6 @@ export function CalendarClient() {
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
   const [platform, setPlatform] = useState<CalendarPlatform>("instagram");
-  const [status, setStatus] = useState<CalendarStatus>("scheduled");
   const [mediaAssetId, setMediaAssetId] = useState("");
   const [scheduledAt, setScheduledAt] = useState(() => datetimeLocal(new Date(Date.now() + 60 * 60_000).toISOString()));
   const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
@@ -111,17 +110,21 @@ export function CalendarClient() {
     finally { setReadinessLoading(false); }
   }
 
-  useEffect(() => { const timer = window.setTimeout(() => void loadData(), 0); return () => window.clearTimeout(timer); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [view, cursor, platformFilter]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadData(), 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, cursor, platformFilter]);
   useEffect(() => { const timer = window.setTimeout(() => void loadReadiness(platform), 0); return () => window.clearTimeout(timer); }, [platform]);
   useEffect(() => { if (autoPublish && readiness && !readiness.backgroundReady) setAutoPublish(false); }, [autoPublish, readiness]);
 
   function resetForm(date?: Date) {
-    setSelectedId(""); setTitle(""); setCaption(""); setPlatform(platformFilter === "all" ? "instagram" : platformFilter); setStatus("scheduled"); setMediaAssetId(""); setAutoPublish(false); setConfirmDelete(false); setError(""); setNotice("");
+    setSelectedId(""); setTitle(""); setCaption(""); setPlatform(platformFilter === "all" ? "instagram" : platformFilter); setMediaAssetId(""); setAutoPublish(false); setConfirmDelete(false); setError(""); setNotice("");
     const base = date ? new Date(date) : new Date(Date.now() + 60 * 60_000); if (date) base.setHours(19, 0, 0, 0); setScheduledAt(datetimeLocal(base.toISOString()));
   }
 
   function editPost(post: ScheduledPost) {
-    setSelectedId(post.id); setTitle(post.title); setCaption(post.caption); setPlatform(post.platform); setStatus(post.status); setMediaAssetId(post.mediaAssetId || ""); setScheduledAt(datetimeLocal(post.scheduledAt || new Date().toISOString())); setAutoPublish(post.autoPublish); setConfirmDelete(false); setError(""); setNotice("");
+    setSelectedId(post.id); setTitle(post.title); setCaption(post.caption); setPlatform(post.platform); setMediaAssetId(post.mediaAssetId || ""); setScheduledAt(datetimeLocal(post.scheduledAt || new Date().toISOString())); setAutoPublish(post.autoPublish); setConfirmDelete(false); setError(""); setNotice("");
   }
 
   function validate(nextStatus: "draft" | "scheduled") {
@@ -141,7 +144,7 @@ export function CalendarClient() {
       const response = await fetch(selectedId ? `/api/calendar/${selectedId}` : "/api/calendar", { method: selectedId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const json = (await response.json()) as PostResponse;
       if (!response.ok || !json.data) throw new Error(json.error || "Plan kaydedilemedi.");
-      setStatus(json.data.status); editPost(json.data); await loadData();
+      editPost(json.data); await loadData();
       setNotice(nextStatus === "draft" ? "Taslak kaydedildi." : json.data.autoPublish ? "Otomatik yayın planlandı. Artık bu sayfayı açık tutman gerekmiyor." : "Takvime eklendi. Bu plan manuel hatırlatma olarak kaydedildi.");
       return json.data;
     } catch (err) { setError(err instanceof Error ? err.message : "Plan kaydedilemedi."); return null; }
@@ -208,8 +211,8 @@ export function CalendarClient() {
           <label className="block text-sm font-semibold text-zinc-200">Ne zaman?<input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-sm font-semibold text-zinc-100 outline-none focus:border-emerald-300" /><span className="mt-2 block text-xs font-normal text-zinc-500">Saat dilimi otomatik: {timezone}</span></label>
 
           <div className={`rounded-2xl border p-4 ${canAutoPublish ? "border-violet-400/30 bg-violet-500/[.08]" : "border-white/10 bg-white/[.025]"}`}>
-            <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-black text-white">Otomatik yayınla</p><p className="mt-1 text-xs leading-5 text-zinc-400">Açık olduğunda bilgisayarını ve BrandFlow'u kapatsan bile seçilen saatte sunucu paylaşır.</p></div><button type="button" role="switch" aria-checked={autoPublish} disabled={!canAutoPublish || readinessLoading} onClick={() => setAutoPublish((value) => !value)} className={`relative h-7 w-12 shrink-0 rounded-full border transition ${autoPublish ? "border-violet-300 bg-violet-500" : "border-white/15 bg-zinc-800"} disabled:cursor-not-allowed disabled:opacity-40`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${autoPublish ? "left-7" : "left-1"}`} /></button></div>
-            <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3 text-xs leading-5 text-zinc-300">{readinessLoading ? "Otomatik yayın kontrol ediliyor..." : readiness?.message || "Otomatik yayın durumu alınamadı."}{readiness?.connected && <span className="mt-1 block text-emerald-200">Hesap: {readiness.accountName || platformLabel(platform)} ✓</span>}{readiness && !readiness.connected && readiness.supported && <a href="/profiles" className="mt-2 inline-block font-black text-violet-200 hover:text-white">Sosyal Hesaplar'a git →</a>}</div>
+            <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-black text-white">Otomatik yayınla</p><p className="mt-1 text-xs leading-5 text-zinc-400">Açık olduğunda bilgisayarını ve BrandFlow&apos;u kapatsan bile seçilen saatte sunucu paylaşır.</p></div><button type="button" role="switch" aria-checked={autoPublish} disabled={!canAutoPublish || readinessLoading} onClick={() => setAutoPublish((value) => !value)} className={`relative h-7 w-12 shrink-0 rounded-full border transition ${autoPublish ? "border-violet-300 bg-violet-500" : "border-white/15 bg-zinc-800"} disabled:cursor-not-allowed disabled:opacity-40`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${autoPublish ? "left-7" : "left-1"}`} /></button></div>
+            <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3 text-xs leading-5 text-zinc-300">{readinessLoading ? "Otomatik yayın kontrol ediliyor..." : readiness?.message || "Otomatik yayın durumu alınamadı."}{readiness?.connected && <span className="mt-1 block text-emerald-200">Hesap: {readiness.accountName || platformLabel(platform)} ✓</span>}{readiness && !readiness.connected && readiness.supported && <a href="/profiles" className="mt-2 inline-block font-black text-violet-200 hover:text-white">Sosyal Hesaplar&apos;a git →</a>}</div>
           </div>
 
           {selectedPost?.failureReason && <div className="rounded-xl border border-red-400/25 bg-red-500/10 p-3 text-sm leading-6 text-red-100"><strong>Son yayın hatası:</strong> {selectedPost.failureReason}{selectedPost.nextAttemptAt && <span className="mt-1 block text-xs text-red-200/80">Tekrar deneme: {postDateLabel(selectedPost.nextAttemptAt)}</span>}</div>}
