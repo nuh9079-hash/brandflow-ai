@@ -4,18 +4,16 @@ import { instagramOAuthConfigured } from "@/lib/social/instagram-oauth";
 
 export async function GET() {
   const { userId } = await auth.protect();
-  const [instagram, facebook] = await Promise.all([
-    getSocialConnection(userId, "instagram"),
-    getSocialConnection(userId, "facebook"),
-  ]);
+  const instagram = await getSocialConnection(userId, "instagram");
   return Response.json({
     data: {
       configured: instagramOAuthConfigured(),
       connected: Boolean(instagram),
       instagramConnected: Boolean(instagram),
-      facebookConnected: Boolean(facebook),
-      accountName: instagram?.accountName || facebook?.accountName || null,
+      accountName: instagram?.accountName || null,
+      accountUsername: instagram?.accountUsername || null,
       externalAccountId: instagram?.externalAccountId || null,
+      tokenExpiresAt: instagram?.tokenExpiresAt || null,
     },
   });
 }
