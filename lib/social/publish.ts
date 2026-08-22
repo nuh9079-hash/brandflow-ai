@@ -59,7 +59,49 @@ async function publishInstagram(post: ScheduledPost): Promise<PublishOutcome> {
   return { ok: true, externalId: published.id, publishedAt: new Date().toISOString() };
 }
 
+async function publishFacebook(post: ScheduledPost): Promise<PublishOutcome> {
+  const connection = await getSocialConnection(post.clerkUserId, "facebook");
+  if (!connection?.accessToken || !connection.externalAccountId) {
+    return { ok: false, status: 503, error: "Facebook Sayfası otomatik yayın için bağlı değil. Sosyal Hesaplar bölümünden Meta hesabını yeniden bağla." };
+  }
+
+  const accessToken = connection.accessToken;
+  const pageId = connection.externalAccountId;
+  let endpoint = `https://graph.facebook.com/${graphVersion}/${pageId}/feed`;
+  const params = new URLSearchParams({ access_token: accessToken });
+
+  if (!post.media?.storagePath) {
+    if (!post.caption.trim()) return { ok: false, status: 400, error: "Facebook paylaşımı için metin veya medya eklemelisin." };
+    params.set("message", post.caption);
+  } else {
+    const signed = await createSignedMediaUrl(post.clerkUserId, post.media.storagePath);
+    if (!signed.ok) return { ok: false, status: signed.status, error: signed.error };
+
+    if (post.media.type === "video") {
+      endpoint = `https://graph.facebook.com/${graphVersion}/${pageId}/videos`;
+      params.set("file_url", signed.data.signedUrl);
+      if (post.title.trim()) params.set("title", post.title.trim());
+      if (post.caption.trim()) params.set("description", post.caption.trim());
+      params.set("published", "true");
+    } else {
+      endpoint = `https://graph.facebook.com/${graphVersion}/${pageId}/photos`;
+      params.set("url", signed.data.signedUrl);
+      if (post.caption.trim()) params.set("caption", post.caption.trim());
+      params.set("published", "true");
+    }
+  }
+
+  const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: params });
+  const body = await response.json() as { id?: string; post_id?: string; success?: boolean; error?: { message?: string } };
+  const externalId = body.post_id || body.id;
+  if (!response.ok || (!externalId && !body.success)) {
+    return { ok: false, status: response.status || 502, error: metaError(body, "Facebook paylaşımı tamamlanamadı.") };
+  }
+  return { ok: true, externalId: externalId || `facebook-${Date.now()}`, publishedAt: new Date().toISOString() };
+}
+
 export async function publishScheduledPost(post: ScheduledPost): Promise<PublishOutcome> {
   if (post.platform === "instagram") return publishInstagram(post);
+  if (post.platform === "facebook") return publishFacebook(post);
   return { ok: false, status: 503, error: `${post.platform} otomatik yayın sağlayıcısı henüz etkin değil. Bu plan başarısız olarak işaretlenmeden önce tekrar denenecek.` };
 }
