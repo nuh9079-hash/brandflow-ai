@@ -16,12 +16,13 @@ import {
 } from "./types";
 
 const tableName = "scheduled_posts";
+type CalendarFailure = { ok: false; status: number; error: string };
 
-function calendarError<T>(status = 500, error = "Takvim işlemi tamamlanamadı."): CalendarServiceResult<T> {
+function calendarError(status = 500, error = "Takvim işlemi tamamlanamadı."): CalendarFailure {
   return { ok: false, status, error };
 }
 
-function supabaseUnavailable<T>(): CalendarServiceResult<T> {
+function supabaseUnavailable(): CalendarFailure {
   return { ok: false, status: 503, error: "Takvim altyapısı yapılandırılmadı." };
 }
 
@@ -246,9 +247,7 @@ export async function listScheduledPosts(userId: string, filters: CalendarFilter
   if (filters.status && filters.status !== "all") query = query.eq("status", filters.status);
 
   const { data, error } = await query.limit(filters.limit ?? 100);
-
   if (error) return calendarError();
-
   return { ok: true, data: (data ?? []).map((row) => normalizePost(row as Record<string, unknown>)) };
 }
 
@@ -265,7 +264,6 @@ export async function getScheduledPost(userId: string, id: string): Promise<Cale
 
   if (error) return calendarError();
   if (!data) return calendarError(404, "Plan bulunamadı.");
-
   return { ok: true, data: normalizePost(data as Record<string, unknown>) };
 }
 
@@ -277,11 +275,8 @@ export async function createScheduledPost(userId: string, input: ScheduledPostIn
 
   const supabase = getSupabaseServerClient();
   if (!supabase) return supabaseUnavailable();
-
   const { data, error } = await supabase.from(tableName).insert(toRow(userId, input)).select("*, media_assets(*)").single();
-
   if (error) return calendarError();
-
   return { ok: true, data: normalizePost(data as Record<string, unknown>) };
 }
 
@@ -298,7 +293,6 @@ export async function updateScheduledPost(userId: string, id: string, input: Sch
 
   const supabase = getSupabaseServerClient();
   if (!supabase) return supabaseUnavailable();
-
   const { data, error } = await supabase
     .from(tableName)
     .update(toUpdateRow(input))
@@ -308,17 +302,13 @@ export async function updateScheduledPost(userId: string, id: string, input: Sch
     .single();
 
   if (error) return calendarError();
-
   return { ok: true, data: normalizePost(data as Record<string, unknown>) };
 }
 
 export async function deleteScheduledPost(userId: string, id: string): Promise<CalendarServiceResult<{ deleted: boolean }>> {
   const supabase = getSupabaseServerClient();
   if (!supabase) return supabaseUnavailable();
-
   const { error } = await supabase.from(tableName).delete().eq("clerk_user_id", userId).eq("id", id);
-
   if (error) return calendarError();
-
   return { ok: true, data: { deleted: true } };
 }
