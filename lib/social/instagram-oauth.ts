@@ -16,7 +16,7 @@ export function instagramAuthorizationUrl(state: string) {
   url.searchParams.set("redirect_uri", required("INSTAGRAM_REDIRECT_URI"));
   url.searchParams.set("state", state);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish");
+  url.searchParams.set("scope", "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish");
   return url.toString();
 }
 
