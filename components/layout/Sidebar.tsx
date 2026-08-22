@@ -16,7 +16,7 @@ const groups:NavGroup[]=[
   {href:"/media",label:"Medya Merkezi",hint:"Dosyalarını yönet"},
  ]},
  {title:"Yayınla",items:[
-  {href:"/publish",label:"Paylaşım & Takvim",hint:"Önizle, planla, yayınla"},
+  {href:"/calendar",label:"Paylaşım & Takvim",hint:"Önizle, planla, otomatik yayınla"},
   {href:"/profiles",label:"Sosyal Hesaplar",hint:"Hesap bağlantılarını yönet"},
  ]},
  {title:"Büyüt",items:[
