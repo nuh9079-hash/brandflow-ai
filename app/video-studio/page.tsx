@@ -4,7 +4,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { VideoStudioClient } from "./VideoStudioClient";
 
 export default async function VideoStudioPage() {
-  await auth.protect();
+  await auth?.protect();
 
   return (
     <main className="min-h-screen bg-[#09090b] text-zinc-100">

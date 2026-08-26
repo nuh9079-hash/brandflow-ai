@@ -43,8 +43,7 @@ export async function GET(request: Request) {
         : !connection
           ? "Otomatik yayın için önce Sosyal Hesaplar bölümünden hesabını bağla."
           : !schedulerActive
-            ? "Hesabın hazır. Sunucu zamanlayıcısı etkinleştiğinde planlar site kapalıyken de otomatik yayınlanacak."
-            : "Hazır: planlanan içerikler site kapalıyken de otomatik yayınlanabilir.",
+            ? "Hesabın hazır. Sunucu zamanlayıcısı etkinleştiğinde planlar site kapalıyken de otomatik yayınlanacak." :"Hazır: planlanan içerikler site kapalıyken de otomatik yayınlanabilir.",
     },
   });
 }

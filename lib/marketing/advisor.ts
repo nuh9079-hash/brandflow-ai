@@ -9,19 +9,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 export type AdvisorPlatform = "instagram" | "facebook" | "tiktok" | "twitter" | "linkedin";
 
 export type AdvisorCategory =
-  | "visualQuality"
-  | "brandConsistency"
-  | "audienceMatch"
-  | "engagementPrediction"
-  | "ctaStrength"
-  | "captionQuality"
-  | "hashtagQuality"
-  | "platformOptimization"
-  | "accessibility"
-  | "readingDifficulty"
-  | "colorHarmony"
-  | "composition"
-  | "textReadability";
+  | "visualQuality" |"brandConsistency" |"audienceMatch" |"engagementPrediction" |"ctaStrength" |"captionQuality" |"hashtagQuality" |"platformOptimization" |"accessibility" |"readingDifficulty" |"colorHarmony" |"composition" |"textReadability";
 
 export type AdvisorCategoryResult = {
   score: number;

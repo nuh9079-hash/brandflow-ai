@@ -347,8 +347,7 @@ export function VideoStudioClient() {
                   onClick={() => setAspectRatio(option.value)}
                   className={`rounded-lg border p-3 text-left transition ${
                     aspectRatio === option.value
-                      ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100"
-                      : "border-white/10 bg-white/[0.03] text-zinc-400 hover:bg-white/5 hover:text-white"
+                      ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100" :"border-white/10 bg-white/[0.03] text-zinc-400 hover:bg-white/5 hover:text-white"
                   }`}
                 >
                   <span className="block text-sm font-black">{option.label}</span>
@@ -385,8 +384,7 @@ export function VideoStudioClient() {
                     onClick={() => setDuration(option)}
                     className={`rounded-lg border px-3 py-3 text-sm font-black transition ${
                       duration === option
-                        ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100"
-                        : "border-white/10 bg-white/[0.03] text-zinc-400 hover:bg-white/5 hover:text-white"
+                        ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100" :"border-white/10 bg-white/[0.03] text-zinc-400 hover:bg-white/5 hover:text-white"
                     }`}
                   >
                     {option} sn
@@ -404,9 +402,7 @@ export function VideoStudioClient() {
                   className={`rounded-full border px-2.5 py-1 text-xs font-bold ${
                     status === "completed"
                       ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                      : status === "failed"
-                        ? "border-red-400/30 bg-red-500/10 text-red-200"
-                        : "border-white/10 bg-white/5 text-zinc-300"
+                      : status === "failed" ?"border-red-400/30 bg-red-500/10 text-red-200" :"border-white/10 bg-white/5 text-zinc-300"
                   }`}
                 >
                   {statusLabels[status]}

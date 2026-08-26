@@ -3,7 +3,7 @@ import { getSocialConnection } from "@/lib/social/connections";
 import { instagramOAuthConfigured } from "@/lib/social/instagram-oauth";
 
 export async function GET() {
-  const { userId } = await auth.protect();
+  const { userId } = await auth?.protect();
   const instagram = await getSocialConnection(userId, "instagram");
   return Response.json({
     data: {

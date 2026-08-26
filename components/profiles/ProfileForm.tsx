@@ -72,11 +72,8 @@ export function ProfileForm({ initialProfile, submitLabel, onCancel, onSubmit }:
 
   function togglePlatform(platform: ProfilePlatform) {
     const key =
-      input.profile_type === "personal"
-        ? "personal_platforms"
-        : input.profile_type === "creator"
-          ? "creator_platforms"
-          : "default_platforms";
+      input.profile_type === "personal" ?"personal_platforms"
+        : input.profile_type === "creator" ?"creator_platforms" :"default_platforms";
     const values = input[key];
     const nextValues = values.includes(platform)
       ? values.filter((entry) => entry !== platform)
@@ -206,8 +203,7 @@ export function ProfileForm({ initialProfile, submitLabel, onCancel, onSubmit }:
               key={platform}
               className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm transition ${
                 selectedPlatforms(input).includes(platform)
-                  ? "border-emerald-400/40 bg-emerald-400/10 text-zinc-100"
-                  : "border-white/10 bg-white/[0.03] text-zinc-400"
+                  ? "border-emerald-400/40 bg-emerald-400/10 text-zinc-100" :"border-white/10 bg-white/[0.03] text-zinc-400"
               }`}
             >
               <input

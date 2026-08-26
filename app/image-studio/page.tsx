@@ -4,7 +4,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { ImageStudioClient } from "./ImageStudioClient";
 
 export default async function ImageStudioPage() {
-  await auth.protect();
+  await auth?.protect();
 
   return (
     <main className="min-h-screen bg-[#09090b] text-zinc-100">

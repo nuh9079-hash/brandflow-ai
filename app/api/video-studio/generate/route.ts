@@ -241,8 +241,7 @@ export async function GET(req: Request) {
         supportedAspectRatios: Object.keys(aspectRatios),
         styles: Array.from(videoStyles),
         message: provider.configured
-          ? ""
-          : "Video Ã¼retimi iÃ§in RUNWAY_API_KEY ortam deÄŸiÅŸkeni eksik. Anahtar eklenmeden gerÃ§ek video Ã¼retilemez.",
+          ? "" :"Video Ã¼retimi iÃ§in RUNWAY_API_KEY ortam deÄŸiÅŸkeni eksik. Anahtar eklenmeden gerÃ§ek video Ã¼retilemez.",
       },
     });
   }

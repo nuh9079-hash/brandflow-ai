@@ -152,8 +152,7 @@ export function ImageStudioClient() {
                   onClick={() => setRatio(option.value)}
                   className={`rounded-lg border p-3 text-left transition ${
                     ratio === option.value
-                      ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100"
-                      : "border-white/10 bg-white/[0.03] text-zinc-400 hover:bg-white/5 hover:text-white"
+                      ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100" :"border-white/10 bg-white/[0.03] text-zinc-400 hover:bg-white/5 hover:text-white"
                   }`}
                 >
                   <span className="block text-sm font-black">{option.label}</span>

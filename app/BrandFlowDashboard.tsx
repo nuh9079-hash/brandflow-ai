@@ -849,8 +849,7 @@ export default function BrandFlowDashboard() {
                         onClick={() => selectMode(option.id)}
                         className={`rounded-lg border p-4 text-left transition ${
                           selected
-                            ? "border-emerald-400/50 bg-emerald-400/10"
-                            : "border-white/10 bg-white/[0.03] hover:bg-white/5"
+                            ? "border-emerald-400/50 bg-emerald-400/10" :"border-white/10 bg-white/[0.03] hover:bg-white/5"
                         }`}
                       >
                         <span className="block text-sm font-black text-zinc-100">{option.title}</span>
@@ -1120,8 +1119,7 @@ export default function BrandFlowDashboard() {
                         key={section.key}
                         className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm transition ${
                           checked
-                            ? "border-emerald-400/40 bg-emerald-400/10 text-zinc-100"
-                            : "border-white/10 bg-white/[0.03] text-zinc-400 hover:bg-white/5"
+                            ? "border-emerald-400/40 bg-emerald-400/10 text-zinc-100" :"border-white/10 bg-white/[0.03] text-zinc-400 hover:bg-white/5"
                         }`}
                       >
                         <input

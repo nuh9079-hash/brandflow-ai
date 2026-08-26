@@ -5,7 +5,7 @@ import { listGeneratedContents } from "@/lib/content-store";
 import { HistoryClient } from "./HistoryClient";
 
 export default async function HistoryPage() {
-  const { userId } = await auth.protect();
+  const { userId } = await auth?.protect();
   const items = await listGeneratedContents(userId);
 
   return (

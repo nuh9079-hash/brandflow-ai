@@ -61,8 +61,7 @@ export function InstagramConnectionCard() {
             : status.connected
               ? `${status.accountUsername ? `@${status.accountUsername}` : status.accountName || "Instagram hesabın"} bağlı. Takvimde planladığın içerikler zamanı gelince BrandFlow tarafından otomatik yayınlanabilir.`
               : status.configured
-                ? "Instagram hesabını normal giriş ekranından bağla. Bir kez izin verdikten sonra BrandFlow planlanan içerikleri sen uygulamayı açmadan yayınlayabilir."
-                : "Instagram bağlantı ayarları eksik. Geliştirici ayarları tamamlanmadan hesap bağlanamaz."}
+                ? "Instagram hesabını normal giriş ekranından bağla. Bir kez izin verdikten sonra BrandFlow planlanan içerikleri sen uygulamayı açmadan yayınlayabilir." :"Instagram bağlantı ayarları eksik. Geliştirici ayarları tamamlanmadan hesap bağlanamaz."}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold">

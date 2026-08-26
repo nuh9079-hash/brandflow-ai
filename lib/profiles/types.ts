@@ -1,18 +1,7 @@
 export type ProfileType = "business" | "personal" | "creator";
 
 export type ProfilePlatform =
-  | "instagram"
-  | "tiktok"
-  | "reels"
-  | "youtubeShorts"
-  | "facebook"
-  | "twitter"
-  | "linkedIn"
-  | "adCopies"
-  | "story"
-  | "hashtags"
-  | "imagePrompts"
-  | "contentPlan";
+  | "instagram" |"tiktok" |"reels" |"youtubeShorts" |"facebook" |"twitter" |"linkedIn" |"adCopies" |"story" |"hashtags" |"imagePrompts" |"contentPlan";
 
 export type UserProfile = {
   id: string;
@@ -125,11 +114,8 @@ export const profilePlatformLabels: Record<ProfilePlatform, string> = {
 export function createEmptyProfileInput(type: ProfileType = "business"): ProfileInput {
   return {
     profile_name:
-      type === "business"
-        ? "Yeni işletme profili"
-        : type === "personal"
-          ? "Yeni kişisel profil"
-          : "Yeni içerik üretici profili",
+      type === "business" ?"Yeni işletme profili"
+        : type === "personal" ?"Yeni kişisel profil" :"Yeni içerik üretici profili",
     profile_type: type,
     is_default: false,
     business_name: "",

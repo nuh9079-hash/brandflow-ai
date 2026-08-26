@@ -3,7 +3,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { ContentCreationFlow } from "@/components/create/ContentCreationFlow";
 
 export default async function CreatePage() {
-  await auth.protect();
+  await auth?.protect();
   return (
     <main className="min-h-screen text-zinc-100">
       <div className="flex min-h-screen flex-col lg:flex-row">

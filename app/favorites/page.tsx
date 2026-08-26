@@ -5,7 +5,7 @@ import { listGeneratedContents } from "@/lib/content-store";
 import { HistoryClient } from "../history/HistoryClient";
 
 export default async function FavoritesPage() {
-  const { userId } = await auth.protect();
+  const { userId } = await auth?.protect();
   const items = await listGeneratedContents(userId, { favoritesOnly: true });
 
   return (
