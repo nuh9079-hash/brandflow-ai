@@ -26,11 +26,9 @@ export function HistoryClient({ initialItems, emptyTitle, emptyDescription }: Hi
 
   useEffect(() => {
     if (!user?.id) return;
-
     const timer = window.setTimeout(() => {
       setItems((current) => mergeGeneratedContents(current, readCachedGeneratedContents(user.id)));
     }, 0);
-
     return () => window.clearTimeout(timer);
   }, [user?.id]);
 
@@ -70,21 +68,15 @@ export function HistoryClient({ initialItems, emptyTitle, emptyDescription }: Hi
     });
   }
 
-  if (items.length === 0) {
-    return <EmptyState title={emptyTitle} description={emptyDescription} />;
-  }
+  if (items.length === 0) return <EmptyState title={emptyTitle} description={emptyDescription} />;
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-[1fr_180px]">
         <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="İçerikte ara..." />
-        <select
-          value={filter}
-          onChange={(event) => setFilter(event.target.value)}
-          className="rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none"
-        >
-          <option value="all">All</option>
-          <option value="favorite">Favorites</option>
+        <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none">
+          <option value="all">Hepsi</option>
+          <option value="favorite">Favoriler</option>
         </select>
       </div>
 
@@ -98,15 +90,13 @@ export function HistoryClient({ initialItems, emptyTitle, emptyDescription }: Hi
                 <div>
                   <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">{new Date(item.created_at).toLocaleDateString("tr-TR")}</p>
                   <h3 className="mt-2 text-lg font-bold text-white">{item.product}</h3>
-                  <p className="mt-1 text-sm text-zinc-400">Tone: {item.tone}</p>
+                  <p className="mt-1 text-sm text-zinc-400">Ton: {item.tone}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="secondary" onClick={() => setSelected(item)}>Open again</Button>
-                  <Button type="button" variant="secondary" onClick={() => copyContent(item.content)}>Copy</Button>
-                  <Button type="button" variant="secondary" onClick={() => toggleFavorite(item)}>
-                    {item.is_favorite ? "Unfavorite" : "Favorite"}
-                  </Button>
-                  <Button type="button" variant="secondary" onClick={() => deleteItem(item.id)}>Delete</Button>
+                  <Button type="button" variant="secondary" onClick={() => setSelected(item)}>Tekrar aç</Button>
+                  <Button type="button" variant="secondary" onClick={() => copyContent(item.content)}>Kopyala</Button>
+                  <Button type="button" variant="secondary" onClick={() => toggleFavorite(item)}>{item.is_favorite ? "Favoriden çıkar" : "Favoriye ekle"}</Button>
+                  <Button type="button" variant="secondary" onClick={() => deleteItem(item.id)}>Sil</Button>
                 </div>
               </div>
               <p className="mt-4 line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-zinc-400">{item.content}</p>
@@ -115,7 +105,7 @@ export function HistoryClient({ initialItems, emptyTitle, emptyDescription }: Hi
         </div>
       )}
 
-      <Modal title={selected?.product ?? "Generated content"} open={Boolean(selected)} onClose={() => setSelected(null)}>
+      <Modal title={selected?.product ?? "Üretilen içerik"} open={Boolean(selected)} onClose={() => setSelected(null)}>
         <pre className="whitespace-pre-wrap rounded-lg bg-zinc-950 p-4 text-sm leading-6 text-zinc-200">{selected?.content}</pre>
       </Modal>
     </div>
