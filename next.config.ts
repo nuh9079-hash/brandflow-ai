@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["*.builtwithrocket.new"],
+  allowedDevOrigins: ['brandflow3678.builtwithrocket.new'],
   turbopack: {},
   webpack(config, { dev }) {
     if (dev) {
