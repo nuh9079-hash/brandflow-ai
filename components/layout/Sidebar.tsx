@@ -17,7 +17,8 @@ const groups:NavGroup[]=[
  ]},
  {title:"Yayınla",items:[
   {href:"/calendar",label:"Paylaşım & Takvim",hint:"Önizle, planla, otomatik yayınla"},
-  {href:"/profiles",label:"Sosyal Hesaplar",hint:"Hesap bağlantılarını yönet"},
+  {href:"/publish",label:"Yayın Merkezi",hint:"Hazır içerikleri kontrol et ve yayınla"},
+  {href:"/profiles",label:"Sosyal Hesaplar",hint:"Hesap bağlantılarını ve marka profillerini yönet"},
  ]},
  {title:"Büyüt",items:[
   {href:"/analytics",label:"Analizler",hint:"Neyin çalıştığını gör"},
