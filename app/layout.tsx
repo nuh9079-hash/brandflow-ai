@@ -4,6 +4,8 @@ import { AnimatedBackground } from "@/components/layout/AnimatedBackground";
 import { ExecutiveAssistant } from "@/components/assistant/ExecutiveAssistant";
 import "./globals.css";
 
+// rebuild: 2026-08-27T19:26:19Z — force fresh build to pick up updated staging env vars
+
 export const metadata: Metadata = {
   title: "BrandFlow AI",
   description: "AI destekli sosyal medya içerik üretim paneli",
