@@ -43,6 +43,7 @@ function NavLink({item,active,compact=false}:{item:NavItem;active:string;compact
 }
 
 export function Sidebar({active="Ana Sayfa"}:SidebarProps){
+ const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
  return <aside className="border-b border-white/10 bg-[#070811]/88 px-4 py-4 backdrop-blur-2xl lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
   <div className="flex items-center justify-between gap-3">
    <Link href="/" className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700 text-sm font-black text-white shadow-lg shadow-violet-500/20">BF</div><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-violet-300">Intelligence</p><h1 className="text-lg font-bold text-white">BrandFlow AI</h1></div></Link>
@@ -54,6 +55,6 @@ export function Sidebar({active="Ana Sayfa"}:SidebarProps){
   </div>
 
   <Card className="mt-8 hidden border-violet-400/10 bg-black/20 p-4 backdrop-blur-xl lg:block"><p className="text-xs uppercase tracking-[.18em] text-violet-300">BrandFlow</p><p className="mt-2 font-semibold text-white">Bir sonraki adımın belli olsun</p><p className="mt-1 text-xs leading-5 text-zinc-400">İçerik üret, önizle, planla ve sonuçları aynı akışta takip et.</p><Link href="/create" className="mt-3 block rounded-xl bg-violet-600 px-3 py-2 text-center text-xs font-black text-white">Yeni içerik hazırla</Link></Card>
-  <div className="mt-4 hidden lg:block"><ProfileSwitcher compact/></div>
+  {clerkEnabled && <div className="mt-4 hidden lg:block"><ProfileSwitcher compact/></div>}
  </aside>
 }
