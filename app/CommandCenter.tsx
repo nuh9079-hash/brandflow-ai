@@ -10,8 +10,7 @@ type Metrics={totalMedia?:number;totalScheduledPosts?:number;advisorReports?:num
 function Glass({children,className=""}:{children:React.ReactNode;className?:string}){return <div className={`rounded-3xl border border-white/10 bg-[#070a16]/65 shadow-2xl shadow-black/20 backdrop-blur-2xl ${className}`}>{children}</div>}
 function UserName(){const{user}=useUser();const name=user?.firstName||user?.fullName||"";return name?<>{`, ${name}`}</>:null}
 
-export default function CommandCenter(){
- const clerkEnabled=Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY&&process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.length>0&&process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!=="undefined"&&process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!=="null"&&process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY&&process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith("pk_")&&process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+export default function CommandCenter({clerkEnabled}:{clerkEnabled:boolean}){
  const[metrics,setMetrics]=useState<Metrics>({});const[loaded,setLoaded]=useState(false);
  const greeting=useMemo(()=>{const h=new Date().getHours();return h<12?"Günaydın":h<18?"İyi günler":"İyi akşamlar"},[]);
  useEffect(()=>{let active=true;fetch("/api/analytics/overview?range=30d&platform=all").then(r=>r.ok?r.json():null).then(j=>{if(active&&j?.data?.metrics)setMetrics(j.data.metrics)}).catch(()=>undefined).finally(()=>active&&setLoaded(true));return()=>{active=false}},[]);
