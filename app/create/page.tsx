@@ -3,7 +3,12 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { ContentCreationFlow } from "@/components/create/ContentCreationFlow";
 
 export default async function CreatePage() {
-  await auth?.protect();
+  const clerkEnabled = Boolean(
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
+  );
+
+  if (clerkEnabled) await auth.protect();
+
   return (
     <main className="min-h-screen text-zinc-100">
       <div className="flex min-h-screen flex-col lg:flex-row">
