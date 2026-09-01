@@ -8,5 +8,5 @@ export default async function Home() {
 
   if (clerkEnabled) await auth.protect();
 
-  return <CommandCenter />;
+  return <CommandCenter clerkEnabled={clerkEnabled} />;
 }
