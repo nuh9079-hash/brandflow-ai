@@ -122,3 +122,5 @@ supabase/
 - Image generation integration
 - Multi-platform publishing workflows
 - Production RLS policies mapped to Clerk JWT claims
+
+<!-- Vercel deployment trigger: 2026-09-01 -->
