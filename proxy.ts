@@ -4,17 +4,13 @@ import { NextResponse, type NextRequest, type NextFetchEvent } from "next/server
 const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)", "/api/media(.*)", "/api/cron(.*)"]);
 const isProtectedRoute = createRouteMatcher(["/","/create(.*)","/history(.*)","/favorites(.*)","/publish(.*)","/profiles(.*)","/media(.*)","/settings(.*)","/billing(.*)","/api(.*)"]);
 
-const clerkHandler = clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req) && isProtectedRoute(req)) await auth.protect();
-});
-
 export default function proxy(req: NextRequest, event: NextFetchEvent) {
   const clerkEnabled = Boolean(
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
   );
 
-  // Safe public review mode for Rocket/Vercel when Clerk is only partially configured.
-  // Never expose API/data routes in review mode.
+  // Rocket review mode: if Clerk is only partially configured, never initialize
+  // Clerk middleware. This prevents the SDK from throwing Missing secretKey.
   if (!clerkEnabled) {
     if (req.nextUrl.pathname.startsWith("/api/")) {
       return NextResponse.json(
@@ -35,6 +31,13 @@ export default function proxy(req: NextRequest, event: NextFetchEvent) {
     home.pathname = "/";
     return NextResponse.redirect(home);
   }
+
+  // Initialize Clerk only after both required keys are confirmed present.
+  const clerkHandler = clerkMiddleware(async (auth, request) => {
+    if (!isPublicRoute(request) && isProtectedRoute(request)) {
+      await auth.protect();
+    }
+  });
 
   return clerkHandler(req, event);
 }
