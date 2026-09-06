@@ -21,6 +21,8 @@ export function HistoryClient({ initialItems, emptyTitle, emptyDescription }: Hi
   const [items, setItems] = useState(initialItems);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
+  const [actionError, setActionError] = useState("");
+  const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<GeneratedContentRecord | null>(null);
   const { user } = useUser();
 
@@ -48,30 +50,51 @@ export function HistoryClient({ initialItems, emptyTitle, emptyDescription }: Hi
   }
 
   async function deleteItem(id: string) {
-    setItems((current) => current.filter((item) => item.id !== id));
+    setBusy(true);
+    setActionError("");
+    try {
+    if (!id.startsWith("local-")) {
+      const response = await fetch("/api/history", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const result = await response.json();
+      if (!response.ok || result.ok !== true) throw new Error(result.error || "İçerik silinemedi. Lütfen tekrar dene.");
+    }
     removeCachedGeneratedContent(user?.id, id);
-    await fetch("/api/history", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
+    setItems((current) => current.filter((item) => item.id !== id));
+    } catch {
+      setActionError("İçerik silinemedi. Bağlantını kontrol edip tekrar dene.");
+    } finally { setBusy(false); }
   }
 
   async function toggleFavorite(item: GeneratedContentRecord) {
     const nextFavorite = !item.is_favorite;
-    setItems((current) => current.map((entry) => (entry.id === item.id ? { ...entry, is_favorite: nextFavorite } : entry)));
+    setBusy(true);
+    setActionError("");
+    try {
+    if (!item.id.startsWith("local-")) {
+      const response = await fetch("/api/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentId: item.id, favorite: nextFavorite }),
+      });
+      const result = await response.json();
+      if (!response.ok || result.ok !== true) throw new Error(result.error || "Favori değişikliği kaydedilemedi.");
+    }
     setCachedGeneratedContentFavorite(user?.id, item.id, nextFavorite);
-    await fetch("/api/favorites", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contentId: item.id, favorite: nextFavorite }),
-    });
+    setItems((current) => current.map((entry) => (entry.id === item.id ? { ...entry, is_favorite: nextFavorite } : entry)));
+    } catch {
+      setActionError("Favori değişikliği kaydedilemedi. Bağlantını kontrol edip tekrar dene.");
+    } finally { setBusy(false); }
   }
 
   if (items.length === 0) return <EmptyState title={emptyTitle} description={emptyDescription} />;
 
   return (
     <div className="space-y-4">
+      {actionError && <p role="alert" className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{actionError}</p>}
       <div className="grid gap-3 md:grid-cols-[1fr_180px]">
         <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="İçerikte ara..." />
         <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-lg border border-white/10 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none">
@@ -95,8 +118,8 @@ export function HistoryClient({ initialItems, emptyTitle, emptyDescription }: Hi
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="secondary" onClick={() => setSelected(item)}>Tekrar aç</Button>
                   <Button type="button" variant="secondary" onClick={() => copyContent(item.content)}>Kopyala</Button>
-                  <Button type="button" variant="secondary" onClick={() => toggleFavorite(item)}>{item.is_favorite ? "Favoriden çıkar" : "Favoriye ekle"}</Button>
-                  <Button type="button" variant="secondary" onClick={() => deleteItem(item.id)}>Sil</Button>
+                  <Button type="button" variant="secondary" disabled={busy} onClick={() => toggleFavorite(item)}>{item.is_favorite ? "Favoriden çıkar" : "Favoriye ekle"}</Button>
+                  <Button type="button" variant="secondary" disabled={busy} onClick={() => deleteItem(item.id)}>Sil</Button>
                 </div>
               </div>
               <p className="mt-4 line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-zinc-400">{item.content}</p>
