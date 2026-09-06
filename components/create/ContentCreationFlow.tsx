@@ -67,7 +67,7 @@ function calendarPlatform(platform: Platform) {
   return "linkedin";
 }
 
-export function ContentCreationFlow() {
+export function ContentCreationFlow({ reviewMode = false }: { reviewMode?: boolean }) {
   const [mode, setMode] = useState<MediaMode>("image");
   const [purpose, setPurpose] = useState("Ürün satmak");
   const [brief, setBrief] = useState("");
@@ -209,6 +209,10 @@ export function ContentCreationFlow() {
   }
 
   async function generateAi(style = improveStyle) {
+    if (reviewMode) {
+      setError("İnceleme modunda AI üretimi kapalıdır. Hesap yapılandırması tamamlandıktan sonra kullanabilirsin.");
+      return;
+    }
     if (!brief.trim()) {
       setError("Bana önce ne yapmak istediğini bir iki cümleyle anlat.");
       return;
@@ -241,6 +245,7 @@ export function ContentCreationFlow() {
   }
 
   return <div className="space-y-6 pb-24">
+    {reviewMode && <p role="status" className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">İnceleme modu: Formu ve taslağını deneyebilirsin. Hesap yapılandırması tamamlanmadığı için AI üretimi, kayıt ve yayın işlemleri kapalıdır.</p>}
     {storageWarning && <p role="alert" className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">{storageWarning}</p>}
     <section className="rounded-3xl border border-white/10 bg-[#070a16]/75 p-4 backdrop-blur-2xl sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -278,7 +283,7 @@ export function ContentCreationFlow() {
         <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[.055] p-4"><p className="text-sm font-black text-white">Nasıl bir ton istiyorsun?</p><div className="mt-3 flex flex-wrap gap-2">{improveStyles.map((item) => <button type="button" key={item.id} onClick={() => { setImproveStyle(item.id); resetAi(); }} className={`rounded-full border px-3 py-2 text-xs font-bold transition ${improveStyle === item.id ? "border-violet-400/50 bg-violet-500/20 text-white" : "border-white/10 bg-black/15 text-zinc-400 hover:text-white"}`}>{item.label}</button>)}</div></div>
 
         {error && <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-4"><p className="text-sm font-bold text-red-100">İçerik hazırlanamadı.</p><p className="mt-1 text-xs leading-5 text-red-200/80">{error}</p><button type="button" onClick={() => void generateAi()} className="mt-3 rounded-lg border border-red-300/20 bg-red-400/10 px-3 py-2 text-xs font-black text-red-100">Tekrar dene</button></div>}
-        <button type="button" onClick={() => void generateAi()} disabled={loading || !brief.trim()} className="w-full rounded-2xl bg-violet-600 px-4 py-4 text-sm font-black text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40">{loading ? `${platform} için hazırlanıyor...` : ai ? `${platform} içeriğini yeniden hazırla` : `${platform} için AI içeriğini hazırla`}</button>
+        <button type="button" onClick={() => void generateAi()} disabled={reviewMode || loading || !brief.trim()} className="w-full rounded-2xl bg-violet-600 px-4 py-4 text-sm font-black text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40">{loading ? `${platform} için hazırlanıyor...` : ai ? `${platform} içeriğini yeniden hazırla` : `${platform} için AI içeriğini hazırla`}</button>
       </div>
 
       <div className="rounded-3xl border border-white/10 bg-[#070a16]/70 p-5 backdrop-blur-2xl sm:p-6">
@@ -296,7 +301,7 @@ export function ContentCreationFlow() {
     <section className="rounded-3xl border border-white/10 bg-[#070a16]/70 p-5 backdrop-blur-2xl sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[.2em] text-fuchsia-300">4 · Önizle ve yayınla</p><h2 className="mt-2 text-xl font-black text-white">Gerçekte nasıl görünecek?</h2><p className="mt-1 text-xs text-zinc-500">Platform değiştirince daha önce hazırladığın içerik kaybolmaz.</p></div><div className="flex flex-wrap gap-2">{platforms.map((item) => <button type="button" key={item} onClick={() => { setPlatform(item); setError(""); }} className={`relative rounded-full px-3 py-2 text-xs font-bold ${platform === item ? "bg-white text-black" : "border border-white/10 text-zinc-400"}`}>{item}{aiByPlatform[item] && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-[#070a16] bg-emerald-400" />}</button>)}</div></div>
 
-      {!ai && brief.trim() && <div className="mx-auto mt-5 max-w-[620px] rounded-2xl border border-violet-400/20 bg-violet-500/[.06] p-4 text-center"><p className="text-sm font-bold text-violet-100">{platform} için henüz içerik hazırlamadın.</p><button type="button" onClick={() => void generateAi()} disabled={loading} className="mt-3 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black text-white">{loading ? "Hazırlanıyor..." : `${platform} içeriğini hazırla`}</button></div>}
+      {!ai && brief.trim() && <div className="mx-auto mt-5 max-w-[620px] rounded-2xl border border-violet-400/20 bg-violet-500/[.06] p-4 text-center"><p className="text-sm font-bold text-violet-100">{platform} için henüz içerik hazırlamadın.</p><button type="button" onClick={() => void generateAi()} disabled={reviewMode || loading} className="mt-3 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black text-white">{loading ? "Hazırlanıyor..." : `${platform} içeriğini hazırla`}</button></div>}
 
       <div className="mx-auto mt-6 max-w-[620px] overflow-hidden rounded-[28px] border border-white/15 bg-black shadow-2xl">
         <div className="flex items-center gap-3 border-b border-white/10 p-4"><div className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500" /><div><p className="text-sm font-black text-white">markan</p><p className="text-[11px] text-zinc-500">{platform} · önizleme</p></div></div>
