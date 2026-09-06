@@ -117,13 +117,12 @@ export async function getDashboardStats(userId: string) {
 
 export async function deleteGeneratedContent(userId: string, contentId: string) {
   const supabase = getSupabaseServerClient();
-  if (!supabase) return { ok: true };
+  if (!supabase) return { ok: false, error: "Veritabanına ulaşılamıyor. İçerik silinmedi." };
 
-  await supabase.from("favorites").delete().eq("user_id", userId).eq("content_id", contentId);
-  await supabase.from("history").delete().eq("user_id", userId).eq("content_id", contentId);
-  const { error } = await supabase.from("generated_contents").delete().eq("user_id", userId).eq("id", contentId);
+  // Child records are removed by the schema's ON DELETE CASCADE constraints.
+  const { data, error } = await supabase.from("generated_contents").delete().eq("user_id", userId).eq("id", contentId).select("id").maybeSingle();
 
-  if (error) {
+  if (error || !data) {
     console.error("Supabase delete failed", error);
     return { ok: false };
   }
@@ -133,22 +132,30 @@ export async function deleteGeneratedContent(userId: string, contentId: string) 
 
 export async function setFavorite(userId: string, contentId: string, favorite: boolean) {
   const supabase = getSupabaseServerClient();
-  if (!supabase) return { ok: true };
+  if (!supabase) return { ok: false, error: "Veritabanına ulaşılamıyor. Favori değişikliği kaydedilmedi." };
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("generated_contents")
     .update({ is_favorite: favorite })
     .eq("user_id", userId)
-    .eq("id", contentId);
+    .eq("id", contentId)
+    .select("id")
+    .maybeSingle();
 
-  if (favorite) {
-    await supabase.from("favorites").upsert({ user_id: userId, content_id: contentId }, { onConflict: "user_id,content_id" });
-  } else {
-    await supabase.from("favorites").delete().eq("user_id", userId).eq("content_id", contentId);
+  if (error || !data) {
+    console.error("Supabase favorite failed", error);
+    return { ok: false };
   }
 
-  if (error) {
-    console.error("Supabase favorite failed", error);
+  let favoriteError;
+  if (favorite) {
+    ({ error: favoriteError } = await supabase.from("favorites").upsert({ user_id: userId, content_id: contentId }, { onConflict: "user_id,content_id" }));
+  } else {
+    ({ error: favoriteError } = await supabase.from("favorites").delete().eq("user_id", userId).eq("content_id", contentId));
+  }
+
+  if (favoriteError) {
+    console.error("Supabase favorite relation failed", favoriteError);
     return { ok: false };
   }
 
@@ -183,7 +190,7 @@ export async function getProfile(userId: string) {
 
 export async function updateProfile(userId: string, profile: Partial<ProfileSettings>) {
   const supabase = getSupabaseServerClient();
-  if (!supabase) return { ok: true };
+  if (!supabase) return { ok: false, error: "Veritabanına ulaşılamıyor. Ayarlar kaydedilmedi." };
 
   const { error } = await supabase
     .from("profiles")
