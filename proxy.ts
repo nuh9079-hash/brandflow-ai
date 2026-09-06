@@ -14,7 +14,7 @@ export default function proxy(req: NextRequest, event: NextFetchEvent) {
   if (!clerkEnabled) {
     if (req.nextUrl.pathname.startsWith("/api/")) {
       return NextResponse.json(
-        { error: "BrandFlow review mode: API access is disabled." },
+        { error: "İnceleme modunda bu işlem kapalıdır. Hesap yapılandırması tamamlandıktan sonra tekrar dene.", code: "REVIEW_MODE" },
         { status: 503 }
       );
     }
