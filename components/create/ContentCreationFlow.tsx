@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type MediaMode = "image" | "video" | "text" | "edit";
 type Platform = "Instagram" | "Reels" | "TikTok" | "YouTube Shorts" | "Facebook" | "LinkedIn";
@@ -85,6 +85,8 @@ export function ContentCreationFlow() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [draftReady, setDraftReady] = useState(false);
+  const [storageWarning, setStorageWarning] = useState("");
+  const generationVersion = useRef(0);
 
   useEffect(() => {
     try {
@@ -111,7 +113,11 @@ export function ContentCreationFlow() {
 
   useEffect(() => {
     if (!draftReady) return;
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ mode, purpose, brief, platform, improveStyle, visualStyle, videoDuration, videoFormat, textLength, editRequest }));
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ mode, purpose, brief, platform, improveStyle, visualStyle, videoDuration, videoFormat, textLength, editRequest }));
+    } catch {
+      // Storage can be blocked or full; keep the editor usable.
+    }
   }, [mode, purpose, brief, platform, improveStyle, visualStyle, videoDuration, videoFormat, textLength, editRequest, draftReady]);
 
   useEffect(() => () => {
@@ -126,6 +132,7 @@ export function ContentCreationFlow() {
   const step = !brief.trim() ? 2 : !ai ? 3 : 4;
 
   function resetAi() {
+    generationVersion.current += 1;
     setAiByPlatform({});
     setError("");
   }
@@ -147,6 +154,10 @@ export function ContentCreationFlow() {
 
   function handleFile(file?: File) {
     if (!file) return;
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      setError("Lütfen bir görsel veya video dosyası seç.");
+      return;
+    }
     if (fileUrl) URL.revokeObjectURL(fileUrl);
     setFileName(file.name);
     setFileType(file.type.startsWith("video/") ? "video" : "image");
@@ -182,6 +193,7 @@ export function ContentCreationFlow() {
   function openCalendar() {
     if (!ai) return;
     const caption = [ai.caption, ai.hashtags.join(" ")].filter(Boolean).join("\n\n");
+    try {
     localStorage.setItem(CALENDAR_PREFILL_KEY, JSON.stringify({
       title: (brief.trim() || `${platform} paylaşımı`).slice(0, 100),
       caption,
@@ -191,6 +203,9 @@ export function ContentCreationFlow() {
       referenceFileName: fileName || null,
     }));
     window.location.href = "/calendar";
+    } catch {
+      setStorageWarning("Takvime aktarım için tarayıcı depolamasına erişilemiyor. Metnini kopyalayarak koru ve tarayıcı ayarlarını kontrol et.");
+    }
   }
 
   async function generateAi(style = improveStyle) {
@@ -204,6 +219,7 @@ export function ContentCreationFlow() {
     }
 
     setLoading(true);
+    const requestVersion = ++generationVersion.current;
     setError("");
     setImproveStyle(style);
     try {
@@ -213,9 +229,11 @@ export function ContentCreationFlow() {
         body: JSON.stringify({ mode, purpose, brief: buildBrief(), platform, improveStyle: style, fileName, fileType }),
       });
       const json = await response.json() as { data?: AiResult; error?: string; source?: "ai" | "fallback" };
-      if (!response.ok || !json.data) throw new Error(json.error || "İçerik hazırlanamadı.");
+      if (!response.ok || !json.data || json.source !== "ai") throw new Error(json.error || "AI içeriği hazırlanamadı. Lütfen tekrar dene.");
+      if (requestVersion !== generationVersion.current) return;
       setAiByPlatform((previous) => ({ ...previous, [platform]: { data: json.data!, source: json.source === "fallback" ? "fallback" : "ai" } }));
     } catch (caught) {
+      if (requestVersion !== generationVersion.current) return;
       setError(caught instanceof Error ? caught.message : "İçerik hazırlanamadı. Tekrar deneyebilirsin.");
     } finally {
       setLoading(false);
@@ -223,6 +241,7 @@ export function ContentCreationFlow() {
   }
 
   return <div className="space-y-6 pb-24">
+    {storageWarning && <p role="alert" className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">{storageWarning}</p>}
     <section className="rounded-3xl border border-white/10 bg-[#070a16]/75 p-4 backdrop-blur-2xl sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="text-xs font-black uppercase tracking-[.2em] text-violet-300">İçerik hazırlama</p><h2 className="mt-1 text-xl font-black text-white">4 adımda paylaşmaya hazırla</h2></div>
