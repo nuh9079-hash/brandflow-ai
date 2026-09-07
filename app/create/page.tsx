@@ -19,7 +19,7 @@ export default async function CreatePage() {
             <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">Fikirden paylaşıma, tek akış.</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">Ne paylaşmak istediğini anlat; görsel, video veya metin seç. Dosyanı ekle ya da sıfırdan üret, AI yayın planını hazırlasın ve paylaşmadan önce platformdaki görünümünü kontrol et.</p>
           </div>
-          <ContentCreationFlow />
+          <ContentCreationFlow reviewMode={!clerkEnabled} />
         </section>
       </div>
     </main>
