@@ -16,6 +16,7 @@ export function InstagramConnectionCard() {
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   async function load() {
     try {
@@ -29,7 +30,24 @@ export function InstagramConnectionCard() {
     }
   }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const outcome = url.searchParams.get("instagram");
+    const messages: Record<string, string> = {
+      connected: "Instagram hesabın bağlandı.",
+      "config-missing": "Instagram bağlantısı henüz kullanıma hazır değil. Lütfen daha sonra tekrar dene.",
+      "state-error": "Bağlantı oturumu sona erdi. Instagram hesabını bağlamayı yeniden başlat.",
+      cancelled: "Instagram bağlantısına izin verilmedi. İstersen yeniden deneyebilirsin.",
+      error: "Instagram bağlantısı tamamlanamadı. Lütfen yeniden dene.",
+    };
+    if (outcome && messages[outcome]) {
+      setNotice(messages[outcome]);
+      url.searchParams.delete("instagram");
+      url.searchParams.delete("reason");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+    void load();
+  }, []);
 
   async function disconnect() {
     setBusy(true);
@@ -59,17 +77,18 @@ export function InstagramConnectionCard() {
           {!status
             ? "Kontrol ediliyor..."
             : status.connected
-              ? `${status.accountUsername ? `@${status.accountUsername}` : status.accountName || "Instagram hesabın"} bağlı. Takvimde planladığın içerikler zamanı gelince BrandFlow tarafından otomatik yayınlanabilir.`
+              ? `${status.accountUsername ? `@${status.accountUsername}` : status.accountName || "Instagram hesabın"} bağlı. Otomatik yayın durumunu takvim ekranından kontrol edebilirsin.`
               : status.configured
-                ? "Instagram hesabını normal giriş ekranından bağla. Bir kez izin verdikten sonra BrandFlow planlanan içerikleri sen uygulamayı açmadan yayınlayabilir." :"Instagram bağlantı ayarları eksik. Geliştirici ayarları tamamlanmadan hesap bağlanamaz."}
+                ? "Instagram hesabını normal giriş ekranından bağla. Bağladıktan sonra takvim ekranından yayın seçeneklerini kontrol edebilirsin." :"Instagram bağlantısı henüz kullanıma hazır değil. Lütfen daha sonra tekrar dene."}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold">
           <span className={`rounded-full border px-3 py-1 ${status?.connected ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200" : "border-white/10 bg-black/20 text-zinc-500"}`}>
             {status?.connected ? "Bağlı ✓" : "Bağlı değil"}
           </span>
-          {status?.connected && <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-zinc-300">Otomatik paylaşım hazır</span>}
+          {status?.connected && <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-zinc-300">Hesap bağlantısı etkin</span>}
         </div>
+        {notice && <p role="status" className="mt-3 text-sm text-violet-200">{notice}</p>}
         {error && <p className="mt-3 text-sm font-semibold text-red-200">{error}</p>}
       </div>
 

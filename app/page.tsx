@@ -1,12 +1,16 @@
 import { auth } from "@clerk/nextjs/server";
-import CommandCenter from "./CommandCenter";
+import { redirect } from "next/navigation";
+import LandingPage from "./LandingPage";
 
 export default async function Home() {
   const clerkEnabled = Boolean(
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
   );
 
-  if (clerkEnabled) await auth.protect();
+  if (clerkEnabled) {
+    const { userId } = await auth();
+    if (userId) redirect("/dashboard");
+  }
 
-  return <CommandCenter clerkEnabled={clerkEnabled} />;
+  return <LandingPage clerkEnabled={clerkEnabled} />;
 }

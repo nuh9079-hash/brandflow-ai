@@ -144,3 +144,28 @@ BrandFlow is ready to launch when:
 - RLS and server-only secrets are verified;
 - billing/usage limits are enforced server-side;
 - critical UX paths work on desktop and mobile.
+
+## 8. Verified state — 2026-09-09
+
+The production deployment was rechecked after the previous auth, Supabase and Groq configuration work:
+
+- Clerk email sign-in works in production.
+- Groq content generation works with `GROQ_TEXT_MODEL=openai/gpt-oss-120b`.
+- Calendar create and refresh persistence works with the restored BrandFlow Supabase project (`xeweudswxeiccexvcfex`).
+- Supabase and Clerk keys must remain configured in Vercel for the Production environment; never copy them into source control.
+
+The follow-up reliability patch in `fix/integration-errors` adds:
+
+- same-origin Instagram OAuth redirects and safe user-facing callback statuses;
+- configuration validation for Instagram storage, encryption, redirect URL and Supabase service access;
+- calendar storage error classification for connection, credentials, schema and permission failures without leaking secrets;
+- readiness that only reports automatic publishing as ready when a supported account, active scheduler and `CRON_SECRET` are all present;
+- regression tests for these cases.
+
+Remaining launch blockers identified by the audit:
+
+- TikTok, X/Twitter, LinkedIn and YouTube social adapters are still placeholders in the current code and must not be presented as working integrations.
+- Instagram/Facebook automatic publishing still requires a real connected account, Vault/token encryption setup and a verified cron deployment.
+- The full authenticated browser flow should be rechecked after the next production deployment, especially Instagram connect/cancel/error paths and calendar create/update/delete.
+
+The local landing-page follow-up adds a public `/` marketing page with the BrandFlow value proposition, feature cards, workflow and product preview. Authenticated users are redirected to the protected `/dashboard` command center, while the existing sign-in and sign-up routes remain available from the landing page. The sidebar now links to `/dashboard` so the public home page and the application home are separate.
