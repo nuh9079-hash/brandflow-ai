@@ -29,6 +29,8 @@ export async function GET(request: Request) {
     }
   }
 
+  const schedulerReady = schedulerEnabled && schedulerActive && Boolean(process.env.CRON_SECRET?.trim());
+
   return Response.json({
     data: {
       platform,
@@ -37,12 +39,12 @@ export async function GET(request: Request) {
       accountName: connection?.accountName || null,
       schedulerEnabled,
       schedulerActive,
-      backgroundReady: supported && Boolean(connection) && schedulerEnabled && schedulerActive,
+      backgroundReady: supported && Boolean(connection) && schedulerReady,
       message: !supported
         ? "Bu platform için otomatik yayın henüz etkin değil; takvimi manuel hatırlatma olarak kullanabilirsin."
         : !connection
           ? "Otomatik yayın için önce Sosyal Hesaplar bölümünden hesabını bağla."
-          : !schedulerActive
+          : !schedulerReady
             ? "Hesabın hazır. Sunucu zamanlayıcısı etkinleştiğinde planlar site kapalıyken de otomatik yayınlanacak." :"Hazır: planlanan içerikler site kapalıyken de otomatik yayınlanabilir.",
     },
   });

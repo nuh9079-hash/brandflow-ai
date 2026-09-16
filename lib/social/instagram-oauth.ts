@@ -15,11 +15,21 @@ function required(name: "INSTAGRAM_CLIENT_ID" | "INSTAGRAM_CLIENT_SECRET" | "INS
 }
 
 export function instagramOAuthConfigured() {
-  return Boolean(
-    process.env.INSTAGRAM_CLIENT_ID?.trim() &&
-    process.env.INSTAGRAM_CLIENT_SECRET?.trim() &&
-    process.env.INSTAGRAM_REDIRECT_URI?.trim(),
-  );
+  if (!process.env.INSTAGRAM_CLIENT_ID?.trim() ||
+      !process.env.INSTAGRAM_CLIENT_SECRET?.trim() ||
+      !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+      (process.env.SOCIAL_TOKEN_ENCRYPTION_KEY?.trim().length || 0) < 32) return false;
+  try {
+    const callback = new URL(process.env.INSTAGRAM_REDIRECT_URI?.trim() || "");
+    const database = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "");
+    return ["http:", "https:"].includes(database.protocol) &&
+      (callback.protocol === "https:" ||
+        (process.env.NODE_ENV !== "production" && callback.protocol === "http:" && callback.hostname === "localhost")) &&
+      callback.pathname === "/api/social/instagram/callback" &&
+      !callback.username && !callback.password && !callback.search && !callback.hash;
+  } catch {
+    return false;
+  }
 }
 
 export function instagramAuthorizationUrl(state: string) {

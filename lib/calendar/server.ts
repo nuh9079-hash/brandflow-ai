@@ -1,3 +1,4 @@
+import { calendarStorageError } from "./storage-error";
 import { getMedia } from "@/lib/media/server";
 import type { MediaAsset } from "@/lib/media/types";
 import { getSocialConnection } from "@/lib/social/connections";
@@ -247,7 +248,7 @@ export async function listScheduledPosts(userId: string, filters: CalendarFilter
   if (filters.status && filters.status !== "all") query = query.eq("status", filters.status);
 
   const { data, error } = await query.limit(filters.limit ?? 100);
-  if (error) return calendarError();
+  if (error) return calendarStorageError(error);
   return { ok: true, data: (data ?? []).map((row) => normalizePost(row as Record<string, unknown>)) };
 }
 
@@ -262,7 +263,7 @@ export async function getScheduledPost(userId: string, id: string): Promise<Cale
     .eq("id", id)
     .maybeSingle();
 
-  if (error) return calendarError();
+  if (error) return calendarStorageError(error);
   if (!data) return calendarError(404, "Plan bulunamadı.");
   return { ok: true, data: normalizePost(data as Record<string, unknown>) };
 }
@@ -276,7 +277,7 @@ export async function createScheduledPost(userId: string, input: ScheduledPostIn
   const supabase = getSupabaseServerClient();
   if (!supabase) return supabaseUnavailable();
   const { data, error } = await supabase.from(tableName).insert(toRow(userId, input)).select("*, media_assets(*)").single();
-  if (error) return calendarError();
+  if (error) return calendarStorageError(error);
   return { ok: true, data: normalizePost(data as Record<string, unknown>) };
 }
 
@@ -301,7 +302,7 @@ export async function updateScheduledPost(userId: string, id: string, input: Sch
     .select("*, media_assets(*)")
     .single();
 
-  if (error) return calendarError();
+  if (error) return calendarStorageError(error);
   return { ok: true, data: normalizePost(data as Record<string, unknown>) };
 }
 
@@ -309,6 +310,6 @@ export async function deleteScheduledPost(userId: string, id: string): Promise<C
   const supabase = getSupabaseServerClient();
   if (!supabase) return supabaseUnavailable();
   const { error } = await supabase.from(tableName).delete().eq("clerk_user_id", userId).eq("id", id);
-  if (error) return calendarError();
+  if (error) return calendarStorageError(error);
   return { ok: true, data: { deleted: true } };
 }

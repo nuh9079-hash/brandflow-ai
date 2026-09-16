@@ -5,8 +5,8 @@ import { ExecutiveAssistant } from "@/components/assistant/ExecutiveAssistant";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BrandFlow AI",
-  description: "AI destekli sosyal medya içerik üretim paneli",
+  title: "BrandFlow AI | Markanı tek ekrandan büyüt",
+  description: "Yapay zekâ ile içerik üret, sosyal medya paylaşımlarını planla ve markanı tek ekrandan büyüt.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

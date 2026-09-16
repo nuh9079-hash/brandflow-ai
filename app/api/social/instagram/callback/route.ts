@@ -12,7 +12,11 @@ export async function GET(request: Request) {
   const store = await cookies();
   const expected = store.get("brandflow_instagram_oauth_state")?.value;
   store.delete("brandflow_instagram_oauth_state");
-  const base = process.env.NEXT_PUBLIC_APP_URL || url.origin;
+  const base = url.origin;
+
+  if (url.searchParams.get("error") === "access_denied" && state && state === expected) {
+    return NextResponse.redirect(new URL("/profiles?instagram=cancelled", base));
+  }
 
   if (!code || !state || !expected || state !== expected) {
     return NextResponse.redirect(new URL("/profiles?instagram=state-error", base));
@@ -35,10 +39,10 @@ export async function GET(request: Request) {
       },
     });
     return NextResponse.redirect(new URL("/profiles?instagram=connected", base));
-  } catch (error) {
-    console.error("instagram oauth callback", error instanceof Error ? error.message : error);
+  } catch {
+    console.error("instagram oauth callback failed", { category: "connection_failed" });
     return NextResponse.redirect(
-      new URL(`/profiles?instagram=error&reason=${encodeURIComponent(error instanceof Error ? error.message : "Bağlantı kurulamadı")}`, base),
+      new URL("/profiles?instagram=error", base),
     );
   }
 }
