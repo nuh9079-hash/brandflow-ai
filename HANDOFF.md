@@ -169,3 +169,12 @@ Remaining launch blockers identified by the audit:
 - The full authenticated browser flow should be rechecked after the next production deployment, especially Instagram connect/cancel/error paths and calendar create/update/delete.
 
 The local landing-page follow-up adds a public `/` marketing page with the BrandFlow value proposition, feature cards, workflow and product preview. Authenticated users are redirected to the protected `/dashboard` command center, while the existing sign-in and sign-up routes remain available from the landing page. The sidebar now links to `/dashboard` so the public home page and the application home are separate.
+
+
+## 9. Landing follow-up — 2026-09-17
+
+- Browser review confirmed the public landing and sign-in form load. The assistant notice was covering the landing before login.
+- Assistant now mounts only outside landing/auth routes, avoiding public context requests and clearing its state on navigation. Its panel stacks above the launcher on narrow screens.
+- Landing header actions wrap onto a full-width row on small screens. The illustrative dashboard is labeled as sample data; copy no longer implies all social integrations work.
+- README now distinguishes the public landing and protected dashboard.
+- Authenticated CRUD and automatic publishing still require a signed-in browser and configured social account; do not report these as verified from public-page checks.
