@@ -1,4 +1,4 @@
-﻿# BrandFlow AI
+# BrandFlow AI
 
 BrandFlow AI is a simple AI content assistant for small businesses that want to create social media posts, ad copy, hashtags, visual ideas, and a 7-day sharing plan from one short product brief.
 
@@ -104,7 +104,8 @@ supabase/
 
 ## Core Routes
 
-- `/` Main content creation flow
+- `/` Public product landing page (signed-in users redirect to `/dashboard`)
+- `/dashboard` Protected command center
 - `/create` Content creation
 - `/history` Saved generated content
 - `/favorites` Favorite content

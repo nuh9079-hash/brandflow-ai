@@ -14,7 +14,7 @@ const steps = [
 
 function MiniChart() {
   return (
-    <svg viewBox="0 0 320 104" className="h-28 w-full" role="img" aria-label="Büyüme grafiği">
+    <svg viewBox="0 0 320 104" className="h-28 w-full" role="img" aria-label="Örnek verilerle büyüme grafiği">
       <defs><linearGradient id="chart-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#8b5cf6" stopOpacity=".35" /><stop offset="1" stopColor="#8b5cf6" stopOpacity="0" /></linearGradient></defs>
       <path d="M0 88 C28 78 28 62 54 69 C81 76 86 47 113 53 C138 59 142 30 169 40 C194 50 202 26 226 31 C250 36 260 12 286 21 C301 26 307 14 320 7 V104 H0Z" fill="url(#chart-fill)" />
       <path d="M0 88 C28 78 28 62 54 69 C81 76 86 47 113 53 C138 59 142 30 169 40 C194 50 202 26 226 31 C250 36 260 12 286 21 C301 26 307 14 320 7" fill="none" stroke="#a78bfa" strokeWidth="3" />
@@ -29,7 +29,7 @@ function DashboardPreview() {
       <div className="absolute -inset-5 -z-10 rounded-[44px] bg-violet-600/20 blur-3xl" />
       <div className="flex items-center justify-between border-b border-white/10 px-2 pb-3">
         <div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-violet-400 to-indigo-700 text-xs font-black">BF</span><span className="text-xs font-black text-white">BrandFlow <b className="text-violet-300">AI</b></span></div>
-        <div className="flex items-center gap-2 text-[10px] text-zinc-500"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Çalışıyor <span className="ml-2 grid h-6 w-6 place-items-center rounded-full bg-violet-400/20 text-violet-200">M</span></div>
+        <div className="flex items-center gap-2 text-[10px] text-zinc-500"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Örnek panel <span className="ml-2 grid h-6 w-6 place-items-center rounded-full bg-violet-400/20 text-violet-200">M</span></div>
       </div>
       <div className="grid gap-3 pt-3 md:grid-cols-[1.25fr_.75fr]">
         <div className="space-y-3">
@@ -41,6 +41,7 @@ function DashboardPreview() {
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[.04] p-3"><div className="flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-zinc-500">Bu ayın performansı</p><p className="mt-2 text-2xl font-black text-white">+42.6%</p></div><span className="rounded-full bg-emerald-400/10 px-2 py-1 text-[9px] font-bold text-emerald-300">↑ büyüme</span></div><div className="mt-5"><MiniChart /></div><div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-xl bg-black/20 p-2"><p className="text-[9px] text-zinc-500">Erişim</p><p className="mt-1 font-black text-white">158.2K</p></div><div className="rounded-xl bg-black/20 p-2"><p className="text-[9px] text-zinc-500">Etkileşim</p><p className="mt-1 font-black text-white">12.4K</p></div></div></div>
       </div>
+      <p className="px-2 pt-3 text-center text-xs leading-5 text-zinc-400">Tanıtım amaçlı örnek ekran. Sayılar gerçek kullanıcı sonuçlarını göstermez.</p>
     </div>
   );
 }
@@ -49,14 +50,14 @@ export default function LandingPage({ clerkEnabled }: { clerkEnabled: boolean })
   const startHref = clerkEnabled ? "/sign-up" : "/create";
   return (
     <main className="min-h-screen overflow-hidden px-5 pb-16 text-zinc-100 sm:px-8">
-      <header className="mx-auto flex max-w-7xl items-center justify-between gap-5 py-6">
+      <header className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 py-6">
         <Link href="/" className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-violet-400 to-indigo-700 text-sm font-black shadow-lg shadow-violet-500/25">BF</span><span className="text-lg font-black tracking-tight">BrandFlow <b className="text-violet-300">AI</b></span></Link>
         <nav className="hidden items-center gap-7 text-sm font-semibold text-zinc-400 lg:flex"><a href="#ozellikler" className="transition hover:text-white">Özellikler</a><a href="#nasil-calisir" className="transition hover:text-white">Nasıl çalışır?</a><a href="#sonuc" className="transition hover:text-white">Sonuçlar</a></nav>
-        <div className="flex items-center gap-2"><Link href="/sign-in" className="rounded-xl border border-white/10 bg-white/[.04] px-4 py-2.5 text-sm font-bold text-zinc-200 transition hover:border-violet-300/40 hover:bg-white/[.08]">Giriş yap</Link><Link href={startHref} className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-500">Ücretsiz başla</Link></div>
+        <div className="flex w-full items-center gap-2 sm:w-auto"><Link href="/sign-in" className="flex-1 whitespace-nowrap rounded-xl border border-white/10 bg-white/[.04] px-4 py-2.5 text-center sm:flex-none text-sm font-bold text-zinc-200 transition hover:border-violet-300/40 hover:bg-white/[.08]">Giriş yap</Link><Link href={startHref} className="flex-1 whitespace-nowrap rounded-xl bg-violet-600 px-4 py-2.5 text-center sm:flex-none text-sm font-black text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-500">Ücretsiz başla</Link></div>
       </header>
 
       <section className="mx-auto grid max-w-7xl items-center gap-12 pb-20 pt-12 lg:grid-cols-[.84fr_1.16fr] lg:gap-10 lg:pb-28 lg:pt-20">
-        <div><div className="inline-flex items-center gap-2 rounded-full border border-violet-400/20 bg-violet-500/10 px-4 py-2 text-xs font-black text-violet-200"><span className="text-sm">✦</span> Yapay zekâ ile daha güçlü markalar</div><h1 className="mt-7 max-w-xl text-5xl font-black leading-[.98] tracking-[-.055em] text-white sm:text-7xl">Markanı tek <span className="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-indigo-400 bg-clip-text text-transparent">ekrandan büyüt.</span></h1><p className="mt-7 max-w-lg text-base leading-7 text-zinc-400 sm:text-lg">İçerik üret, planla ve tüm sosyal medya hesaplarını tek akışta yönet. BrandFlow AI, markanın bir sonraki adımını senin için netleştirir.</p><div className="mt-8 flex flex-wrap gap-3"><Link href={startHref} className="rounded-2xl bg-violet-600 px-6 py-3.5 text-sm font-black text-white shadow-[0_12px_35px_rgba(124,58,237,.35)] transition hover:-translate-y-0.5 hover:bg-violet-500">Ücretsiz başla <span className="ml-2">→</span></Link><a href="#nasil-calisir" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-black/20 px-6 py-3.5 text-sm font-bold text-zinc-200 transition hover:bg-white/[.07]"><span className="grid h-6 w-6 place-items-center rounded-full border border-white/20 text-[10px]">▶</span> Nasıl çalışır?</a></div><div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs text-zinc-500"><span>✓ Kredi kartı gerekmez</span><span>✓ Kurulumu kolay</span><span>✓ Her ölçekte marka için</span></div></div>
+        <div><div className="inline-flex items-center gap-2 rounded-full border border-violet-400/20 bg-violet-500/10 px-4 py-2 text-xs font-black text-violet-200"><span className="text-sm">✦</span> Yapay zekâ ile daha güçlü markalar</div><h1 className="mt-7 max-w-xl text-5xl font-black leading-[.98] tracking-[-.055em] text-white sm:text-7xl">Markanı tek <span className="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-indigo-400 bg-clip-text text-transparent">ekrandan büyüt.</span></h1><p className="mt-7 max-w-lg text-base leading-7 text-zinc-400 sm:text-lg">İçerik üret, planla ve sosyal medya içeriklerini tek akışta düzenle. BrandFlow AI, markanın bir sonraki adımını senin için netleştirir.</p><div className="mt-8 flex flex-wrap gap-3"><Link href={startHref} className="rounded-2xl bg-violet-600 px-6 py-3.5 text-sm font-black text-white shadow-[0_12px_35px_rgba(124,58,237,.35)] transition hover:-translate-y-0.5 hover:bg-violet-500">Ücretsiz başla <span className="ml-2">→</span></Link><a href="#nasil-calisir" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-black/20 px-6 py-3.5 text-sm font-bold text-zinc-200 transition hover:bg-white/[.07]"><span className="grid h-6 w-6 place-items-center rounded-full border border-white/20 text-[10px]">▶</span> Nasıl çalışır?</a></div><div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs text-zinc-500"><span>✓ Kredi kartı gerekmez</span><span>✓ Kurulumu kolay</span><span>✓ Her ölçekte marka için</span></div></div>
         <DashboardPreview />
       </section>
 
