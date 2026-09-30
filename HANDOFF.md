@@ -178,3 +178,14 @@ The local landing-page follow-up adds a public `/` marketing page with the Brand
 - Landing header actions wrap onto a full-width row on small screens. The illustrative dashboard is labeled as sample data; copy no longer implies all social integrations work.
 - README now distinguishes the public landing and protected dashboard.
 - Authenticated CRUD and automatic publishing still require a signed-in browser and configured social account; do not report these as verified from public-page checks.
+
+## 10. Access and discovery follow-up — 2026-09-30
+
+- Public HTTP audit confirmed `/sign-in` and `/sign-up` exist, landing CTAs have real destinations, and footer exists. Rocket's missing-login/footer conclusions were inaccurate.
+- Signed-out non-browser `/dashboard` requests returned Clerk `protect-rewrite` 404. Proxy now explicitly redirects signed-out protected page visitors to the local sign-in page with their original URL; API protection remains unchanged.
+- `/login` and `/signup` redirect to the existing Clerk routes.
+- Dashboard metrics errors are visible with a retry action instead of silently showing dashes.
+- Added robots and sitemap metadata. Only the public landing is indexable; account/application routes remain excluded from discovery.
+- Landing explains the brief-to-calendar flow; sample calendar is labeled as an example week rather than a stale month.
+- Privacy/terms/contact pages still need accurate operator details and approved content. Do not claim legal compliance, invent contact details, pricing, or testimonials.
+- Authenticated image generation, storage and social publishing remain unverified. Public checks do not prove those flows work.
