@@ -35,6 +35,16 @@ export default function proxy(req: NextRequest, event: NextFetchEvent) {
   // Initialize Clerk only after both required keys are confirmed present.
   const clerkHandler = clerkMiddleware(async (auth, request) => {
     if (!isPublicRoute(request) && isProtectedRoute(request)) {
+      // Page visitors need a sign-in screen even for non-browser requests.
+      // Keep the existing protection behavior for APIs.
+      if (!request.nextUrl.pathname.startsWith("/api/")) {
+        const { userId } = await auth();
+        if (!userId) {
+          const signIn = new URL("/sign-in", request.url);
+          signIn.searchParams.set("redirect_url", request.url);
+          return NextResponse.redirect(signIn);
+        }
+      }
       await auth.protect();
     }
   });

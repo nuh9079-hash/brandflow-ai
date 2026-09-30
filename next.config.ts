@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  redirects() {
+    return [
+      { source: "/login", destination: "/sign-in", permanent: false },
+      { source: "/signup", destination: "/sign-up", permanent: false },
+    ];
+  },
   allowedDevOrigins: ['brandflow3678.builtwithrocket.new'],
   turbopack: {},
   webpack(config, { dev }) {
