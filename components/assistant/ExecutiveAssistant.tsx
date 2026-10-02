@@ -10,7 +10,7 @@ type Context={mediaCount:number|null;scheduledCount:number|null;latestAdvisor:nu
 
 export function ExecutiveAssistant(){
  const pathname=usePathname();
- if(pathname==="/"||pathname.startsWith("/sign-in")||pathname.startsWith("/sign-up"))return null;
+ if(["/", "/features", "/about"].includes(pathname)||pathname.startsWith("/sign-in")||pathname.startsWith("/sign-up"))return null;
  return <AssistantPanel key={pathname} />;
 }
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PublicFooter } from "@/components/marketing/PublicSite";
 
 const features = [
   ["✦", "AI içerik üretimi", "Markanı, hedef kitleni ve tonunu anlayan içerikler oluştur."],
@@ -52,7 +53,7 @@ export default function LandingPage({ clerkEnabled }: { clerkEnabled: boolean })
     <main className="min-h-screen overflow-hidden px-5 pb-16 text-zinc-100 sm:px-8">
       <header className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 py-6">
         <Link href="/" className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-violet-400 to-indigo-700 text-sm font-black shadow-lg shadow-violet-500/25">BF</span><span className="text-lg font-black tracking-tight">BrandFlow <b className="text-violet-300">AI</b></span></Link>
-        <nav className="hidden items-center gap-7 text-sm font-semibold text-zinc-400 lg:flex"><a href="#ozellikler" className="transition hover:text-white">Özellikler</a><a href="#nasil-calisir" className="transition hover:text-white">Nasıl çalışır?</a><a href="#sonuc" className="transition hover:text-white">Sonuçlar</a></nav>
+        <nav className="hidden items-center gap-7 text-sm font-semibold text-zinc-400 lg:flex"><a href="/features" className="transition hover:text-white">Özellikler</a><a href="#nasil-calisir" className="transition hover:text-white">Nasıl çalışır?</a><Link href="/about" className="transition hover:text-white">Hakkında</Link></nav>
         <div className="flex w-full items-center gap-2 sm:w-auto"><Link href="/sign-in" className="flex-1 whitespace-nowrap rounded-xl border border-white/10 bg-white/[.04] px-4 py-2.5 text-center sm:flex-none text-sm font-bold text-zinc-200 transition hover:border-violet-300/40 hover:bg-white/[.08]">Giriş yap</Link><Link href={startHref} className="flex-1 whitespace-nowrap rounded-xl bg-violet-600 px-4 py-2.5 text-center sm:flex-none text-sm font-black text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-500">Ücretsiz başla</Link></div>
       </header>
 
@@ -67,7 +68,7 @@ export default function LandingPage({ clerkEnabled }: { clerkEnabled: boolean })
 
       <section id="sonuc" className="mx-auto max-w-7xl py-14"><div className="overflow-hidden rounded-[32px] border border-violet-300/20 bg-gradient-to-br from-violet-500/20 via-[#10132b] to-cyan-500/10 px-6 py-12 text-center shadow-2xl shadow-violet-950/30 sm:px-12"><p className="text-xs font-black uppercase tracking-[.24em] text-violet-200">Bir sonraki adım belli olsun</p><h2 className="mx-auto mt-4 max-w-2xl text-3xl font-black tracking-tight text-white sm:text-5xl">Markan için daha az karmaşa, daha çok ivme.</h2><p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-zinc-300">BrandFlow AI ile her gün ne paylaşacağını düşünmek yerine markanı büyütmeye odaklan.</p><Link href={startHref} className="mt-8 inline-flex rounded-2xl bg-white px-6 py-3.5 text-sm font-black text-violet-950 transition hover:bg-violet-50">Hemen başla <span className="ml-2">→</span></Link></div></section>
 
-      <footer className="mx-auto flex max-w-7xl flex-col gap-3 border-t border-white/10 pt-7 text-xs text-zinc-600 sm:flex-row sm:items-center sm:justify-between"><span>© 2026 BrandFlow AI</span><div className="flex gap-5"><Link href="/sign-in" className="hover:text-zinc-300">Giriş yap</Link><Link href="/sign-up" className="hover:text-zinc-300">Hesap oluştur</Link></div></footer>
+      <PublicFooter />
     </main>
   );
 }
