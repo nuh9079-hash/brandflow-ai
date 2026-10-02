@@ -189,3 +189,10 @@ The local landing-page follow-up adds a public `/` marketing page with the Brand
 - Landing explains the brief-to-calendar flow; sample calendar is labeled as an example week rather than a stale month.
 - Privacy/terms/contact pages still need accurate operator details and approved content. Do not claim legal compliance, invent contact details, pricing, or testimonials.
 - Authenticated image generation, storage and social publishing remain unverified. Public checks do not prove those flows work.
+
+## 11. Rocket export review — 2026-10-02
+
+- Independent Rocket export uses localStorage mock auth, fixed AI outputs, simulated contact/password reset, and unbound publish buttons. Do not replace the real app with it.
+- Added original `/features` and `/about` pages inspired by its public-page structure, matching the existing dark theme and actual workflow. Shared footer links only to implemented pages.
+- Public informational pages do not mount the app assistant. Clerk/API/database integrations are unchanged.
+- Pricing, legal and contact content awaits real operator/pricing details; no invented claims imported. Authenticated generation/publishing remains unverified.

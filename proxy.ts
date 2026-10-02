@@ -20,7 +20,7 @@ export default function proxy(req: NextRequest, event: NextFetchEvent) {
     }
 
     const allowedReviewPage =
-      req.nextUrl.pathname === "/" ||
+      ["/", "/features", "/about"].includes(req.nextUrl.pathname) ||
       req.nextUrl.pathname.startsWith("/create") ||
       req.nextUrl.pathname.startsWith("/_next/") ||
       /\.[a-zA-Z0-9]+$/.test(req.nextUrl.pathname);
