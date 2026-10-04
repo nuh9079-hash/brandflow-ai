@@ -8,7 +8,10 @@ export default function LandingBrief() {
   function begin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const brief = String(new FormData(event.currentTarget).get("brief") || "").trim();
-    if (!brief) return;
+    if (!brief) {
+      setError("Başlamak için fikrini birkaç kelimeyle anlat.");
+      return;
+    }
     try {
       sessionStorage.setItem("brandflow-welcome-brief-v1", brief);
       window.location.assign("/create");

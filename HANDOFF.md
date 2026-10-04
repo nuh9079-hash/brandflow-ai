@@ -204,3 +204,4 @@ The local landing-page follow-up adds a public `/` marketing page with the Brand
 - Landing brief is handed off through same-tab session storage to protected /create after sign-in. It preserves the existing draft settings; only the brief is replaced by explicit submission. Storage failure stays visible on the form.
 - Signup/signin and informational links use existing real routes. Examples are explicitly illustrative; calendar planning is distinguished from automatic publishing.
 - No invented pricing, testimonials, customer results or legal claims. Authenticated generation and publishing verification remains outstanding.
+- Validation: production webpack build and 19 tests pass; preview browser confirmed full-page rendering and brief transfer into the existing editor. Mobile breakpoints implemented; cloud browser does not expose viewport resizing. Production signed-in AI/social flow is not claimed verified.
