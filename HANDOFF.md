@@ -196,3 +196,12 @@ The local landing-page follow-up adds a public `/` marketing page with the Brand
 - Added original `/features` and `/about` pages inspired by its public-page structure, matching the existing dark theme and actual workflow. Shared footer links only to implemented pages.
 - Public informational pages do not mount the app assistant. Clerk/API/database integrations are unchanged.
 - Pricing, legal and contact content awaits real operator/pricing details; no invented claims imported. Authenticated generation/publishing remains unverified.
+
+## 12. Creative desk public welcome — 2026-10-04
+
+- Implemented the user-confirmed paper/worktable reference: dark botanical desk, ivory idea note, four-step paper journey, illustrative brand polaroids, FAQ and invitation footer.
+- All text, navigation, controls and FAQ are real accessible HTML. Scoped responsive CSS leaves application styles unchanged. Generated decorative WebP assets contain no UI text.
+- Landing brief is handed off through same-tab session storage to protected /create after sign-in. It preserves the existing draft settings; only the brief is replaced by explicit submission. Storage failure stays visible on the form.
+- Signup/signin and informational links use existing real routes. Examples are explicitly illustrative; calendar planning is distinguished from automatic publishing.
+- No invented pricing, testimonials, customer results or legal claims. Authenticated generation and publishing verification remains outstanding.
+- Validation: production webpack build and 19 tests pass; preview browser confirmed full-page rendering and brief transfer into the existing editor. Mobile breakpoints implemented; cloud browser does not expose viewport resizing. Production signed-in AI/social flow is not claimed verified.

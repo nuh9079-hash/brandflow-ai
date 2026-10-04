@@ -107,6 +107,14 @@ export function ContentCreationFlow({ reviewMode = false }: { reviewMode?: boole
     } catch {
       // Bozuk yerel taslak yeni taslağın açılmasını engellemesin.
     } finally {
+      try {
+        const welcomeBrief = sessionStorage.getItem("brandflow-welcome-brief-v1");
+        if (welcomeBrief) {
+          setBrief(welcomeBrief);
+        }
+      } catch {
+        // Existing drafts remain usable when session storage is unavailable.
+      }
       setDraftReady(true);
     }
   }, []);
@@ -115,6 +123,9 @@ export function ContentCreationFlow({ reviewMode = false }: { reviewMode?: boole
     if (!draftReady) return;
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({ mode, purpose, brief, platform, improveStyle, visualStyle, videoDuration, videoFormat, textLength, editRequest }));
+      if (sessionStorage.getItem("brandflow-welcome-brief-v1") === brief) {
+        sessionStorage.removeItem("brandflow-welcome-brief-v1");
+      }
     } catch {
       // Storage can be blocked or full; keep the editor usable.
     }
